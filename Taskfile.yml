@@ -1,0 +1,51 @@
+# https://taskfile.dev
+
+version: '3'
+
+vars:
+  GREETING: Hello, World!
+
+tasks:
+  default:
+    cmds:
+      - echo "{{.GREETING}}"
+    silent: true
+
+  setup:
+    cmds:
+      - npm install
+      - npm install allure-commandline
+
+  build:
+    cmds:
+      - npm run build
+  validate:
+    deps:
+      - build
+    cmds:
+      - npm start validate tests/sample.yaml
+  run:
+    deps:
+      - build
+    cmds:
+      - npm start run tests/sample.yaml \
+        --pg-host localhost \
+        --pg-database testdb \
+        --pg-user testuser \
+        --pg-password testpass \
+        --base-url http://localhost:3000 \
+        --test-case-id sample-test-001
+
+  up:
+    cmds:
+      - docker compose up postgres echo-service
+
+  dockerBuild:
+    cmds:
+      - docker compose build
+
+  dockerRun:
+    deps:
+      - dockerBuild
+    cmds:
+      - docker compose run --rm yaml-test-engine run /app/tests/sample.yaml

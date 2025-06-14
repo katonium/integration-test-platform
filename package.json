@@ -1,0 +1,36 @@
+{
+  "name": "yaml-test-engine",
+  "version": "1.0.0",
+  "description": "YAML-based test engine for PostgreSQL and REST API testing",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "test": "npm run build && npm start"
+  },
+  "dependencies": {
+    "allure-commandline": "^2.34.0",
+    "axios": "^1.6.2",
+    "chalk": "^4.1.2",
+    "commander": "^11.1.0",
+    "pg": "^8.11.3",
+    "yamljs": "^0.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.9.0",
+    "@types/pg": "^8.10.7",
+    "@types/yamljs": "^0.2.34",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.2.2"
+  },
+  "keywords": [
+    "yaml",
+    "test",
+    "engine",
+    "postgresql",
+    "rest-api"
+  ],
+  "author": "",
+  "license": "MIT"
+}

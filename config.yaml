@@ -1,0 +1,10 @@
+postgresql:
+  host: localhost
+  port: 5432
+  database: testdb
+  user: testuser
+  password: testpass
+baseUrl: http://echo-service:8080
+testCaseId: sample-test-001
+
+

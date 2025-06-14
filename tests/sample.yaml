@@ -1,0 +1,52 @@
+kind: TestCase
+version: "1.1"
+name: sample test case
+step:
+- name: prepare data 1
+  id: prep-1
+  kind: PostgreSQL
+  params:
+    query: "INSERT INTO users (name, email, age) VALUES ('Taro yamada', 'yamada@example.com', 30);"
+- name: prepare data 2
+  kind: PostgreSQL
+  params:
+    fromFile: sql/prep2.sql
+- name: execute pre-test api
+  kind: RESTApiExecution
+  id: api_execution
+  params:
+    request:
+      url: "{baseUrl}/sample/1"
+      method: POST
+      headers:
+      - content-type: application/json
+      - x-testcase-id: "{testCaseId}"
+      body:
+        hello: world
+        sample:
+          sample2:
+          - this
+          - is
+          - array
+    responseAssertion:
+      status: 200
+      headers:
+      - content-type: [shouldNotBeNull]
+      - x-testcase-id: [shouldBeNull]
+      body:
+        message: [shouldNotBeNull]
+        sample: OK
+- name: validation table
+  id: valid-1
+  kind: PostgreSQL
+  params:
+    query: "SELECT name, age FROM users WHERE name='Taro yamada';"
+  responseAssertion:
+    name: 'Taro yamada'
+    age: [api_execution.response.status]
+- name: cleanup table
+  kind: PostgreSQL
+  params:
+    query: "DELETE FROM users WHERE name='Taro yamada';"
+  responseAssertion:
+    count: 1
