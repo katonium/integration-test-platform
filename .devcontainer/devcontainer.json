@@ -1,0 +1,14 @@
+{
+  "image": "node:24",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "github.copilot-chat",
+        "github.copilot",
+        "github.copilot-workspace",
+        "github.vscode-github-actions"
+      ]
+    }
+  },
+  "forwardPorts": [8080]
+}
