@@ -1,0 +1,45 @@
+kind: TestCase
+version: "1.1"
+name: Sample Echo and Nop Test Case
+step:
+  - name: Initialize test data
+    id: init_data
+    kind: Echo
+    params:
+      message: "Test initialization"
+      testCaseId: "{testCaseId}"
+      baseUrl: "{baseUrl}"
+      data:
+        users:
+          - name: "Taro Yamada"
+            email: "yamada@example.com"
+            age: 30
+          - name: "Hanako Sato"
+            email: "sato@example.com" 
+            age: 25
+
+  - name: Simple success operation
+    id: success_op
+    kind: Nop
+
+  - name: Echo previous step result
+    id: echo_prev
+    kind: Echo
+    params:
+      message: "Echoing previous step"
+      previousStepStatus: "{success_op.response.status}"
+      initDataEcho: "{init_data.response.echo.data.users[0].name}"
+      testInfo:
+        testId: "{testCaseId}"
+        testName: "{testCaseName}"
+
+  - name: Final validation
+    kind: Echo
+    params:
+      summary:
+        totalSteps: 4
+        testCaseId: "{testCaseId}"
+        allPreviousSteps:
+          init: "{init_data.success}"
+          success: "{success_op.success}"  
+          echo: "{echo_prev.success}"

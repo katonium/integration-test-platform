@@ -9,43 +9,33 @@ tasks:
   default:
     cmds:
       - echo "{{.GREETING}}"
-    silent: true
 
   setup:
+    desc: setup workspace
     cmds:
-      - npm install
-      - npm install allure-commandline
+      - go install github.com/google/go-containerregistry/cmd/crane@latest
+      - npm install -g @anthropic-ai/claude-code
 
-  build:
+  clean:
+    desc: clean up workspace
     cmds:
-      - npm run build
-  validate:
-    deps:
-      - build
-    cmds:
-      - npm start validate tests/sample.yaml
+      - rm -r allure-results
+
   run:
-    deps:
-      - build
+    desc: run test cases
     cmds:
-      - npm start run tests/sample.yaml \
-        --pg-host localhost \
-        --pg-database testdb \
-        --pg-user testuser \
-        --pg-password testpass \
-        --base-url http://localhost:3000 \
-        --test-case-id sample-test-001
+      - npm run test
 
-  up:
+  allure:dockerBuild:
+    desc: build allure report
     cmds:
-      - docker compose up postgres echo-service
+      - docker build -t allure-serve ./allure
 
-  dockerBuild:
+  allure:dockerRun:  # テスト結果をマウントしてサーバー起動
     cmds:
-      - docker compose build
+      - docker run --rm --name allure-serve -p 8083:8083 -v $(pwd)/allure-results:/app/allure-results allure-serve
 
-  dockerRun:
-    deps:
-      - dockerBuild
+  allure:dockerStop:
+    desc: stop allure report server
     cmds:
-      - docker compose run --rm yaml-test-engine run /app/tests/sample.yaml
+      - docker stop allure-serve || true

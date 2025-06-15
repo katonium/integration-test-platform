@@ -1,10 +1,11 @@
-postgresql:
-  host: localhost
+baseUrl: "http://localhost:8080"
+database:
+  host: "localhost"
   port: 5432
-  database: testdb
-  user: testuser
-  password: testpass
-baseUrl: http://echo-service:8080
-testCaseId: sample-test-001
-
-
+  name: "testdb"
+api:
+  timeout: 30000
+  retries: 3
+test:
+  outputDir: "./test-results"
+  reportFormat: "allure"

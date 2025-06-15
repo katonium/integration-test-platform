@@ -1,78 +1,96 @@
-# YAML Test Engine
+# Integration Test Platform
 
-TypeScriptで作成されたYAMLベースのテストエンジンです。PostgreSQLクエリとREST API呼び出しをサポートし、レスポンスアサーションによる検証が可能です。
+TypeScriptで実装されたYAMLベースのテストワークフロー実行エンジンです。
 
-## 特徴
+## 概要
 
-- **YAML設定**: テストケースをYAMLで記述
-- **PostgreSQL対応**: SQLクエリの実行とアサーション
-- **REST API対応**: HTTP リクエストの実行とレスポンス検証
-- **テンプレート変数**: `{baseUrl}`, `{testCaseId}` などの動的値
-- **ステップ間のデータ共有**: 前のステップの結果を後のステップで利用
-- **包括的なアサーション**: 値の比較、null チェック、特殊条件など
-- **Docker対応**: コンテナ環境での実行
+このプラットフォームは以下の機能を提供します：
 
-## インストール
+- YAMLで記述されたテストケースの実行
+- 拡張可能なアクションシステム
+- ステップ間での出力データ共有
+- 設定管理とテンプレート変数機能
+- Allureレポート生成
+- Dockerでのレポート表示
 
-### ローカル実行
+## アーキテクチャ
+
+### コアコンポーネント
+
+#### TestEngine
+- YAMLテストケースの解析と実行
+- アクションの管理と実行
+- 変数置換とコンテキスト管理
+
+#### Actions
+- `BaseAction`: 統一インターフェースを持つ抽象クラス
+- `EchoAction`: 入力をそのまま出力として返すアクション
+- `NopAction`: 常に成功するアクション  
+- `FailAction`: 常に失敗するアクション
+
+#### Reporters
+- `BaseReporter`: レポーティングの抽象クラス
+- `AllureReporter`: Allureレポート生成機能
+
+#### Config
+- YAML設定ファイルの読み込み
+- 環境変数による設定オーバーライド
+- `Config.get("key.subKey")` インターフェース
+
+## セットアップ
+
+### 依存関係のインストール
 
 ```bash
 npm install
-npm run build
 ```
 
-### Docker使用
+### TypeScriptコンパイル
 
 ```bash
-docker-compose up -d postgres
-docker-compose build yaml-test-engine
+npm run build
 ```
 
 ## 使用方法
 
-### コマンドライン
-
-#### テスト実行
+### テスト実行
 
 ```bash
-# ローカル実行
-npm run dev run tests/sample.yaml \
-  --pg-host localhost \
-  --pg-database testdb \
-  --pg-user testuser \
-  --pg-password testpass \
-  --base-url http://localhost:3000 \
-  --test-case-id sample-test-001
+# 全てのテストファイルを実行（デフォルト: test-cases/）
+npm test
 
-# ビルド済みの場合
-npm start run tests/sample.yaml [オプション]
+# 特定のファイルを実行
+npm test test-cases/echo-sample.yaml
+
+# 複数のファイルを実行
+npm test test-cases/echo-sample.yaml test-cases/failure-sample.yaml
+
+# 特定のディレクトリ内の全てのテストを実行
+npm test test-cases/
+
+# 複数のディレクトリやファイルを組み合わせて実行
+npm test test-cases/echo-sample.yaml test-cases/subfolder/
 ```
 
-#### テストファイル検証
+### 設定ファイル
 
-```bash
-npm run dev validate tests/sample.yaml
+`config.yaml` でベース設定を定義：
+
+```yaml
+baseUrl: "http://localhost:8080"
+database:
+  host: "localhost"
+  port: 5432
+  name: "testdb"
+api:
+  timeout: 30000
+  retries: 3
 ```
 
-### Docker実行
+### 環境変数での設定オーバーライド
 
 ```bash
-# PostgreSQLコンテナを起動
-docker-compose up -d postgres
-
-# テストを実行
-docker run --rm \
-  --network yaml-test-engine_default \
-  -v $(pwd)/tests:/app/tests \
-  -v $(pwd)/sql:/app/sql \
-  yaml-test-engine_yaml-test-engine \
-  run /app/tests/sample.yaml \
-  --pg-host postgres \
-  --pg-database testdb \
-  --pg-user testuser \
-  --pg-password testpass \
-  --base-url http://host.docker.internal:3000 \
-  --test-case-id sample-test-001
+DATABASE_HOST=test-db npm test
 ```
 
 ## テストケースの書き方
@@ -82,188 +100,150 @@ docker run --rm \
 ```yaml
 kind: TestCase
 version: "1.1"
-name: テストケース名
+name: Sample Test Case
 step:
-  - name: ステップ名
-    id: step-id  # オプション、他のステップから参照する場合
-    kind: PostgreSQL | RESTApiExecution
-    params: # ステップ固有のパラメータ
-    responseAssertion: # レスポンス検証（オプション）
+  - name: Initialize test data
+    id: init_data
+    kind: Echo
+    params:
+      message: "Test initialization"
+      data:
+        users:
+          - name: "Taro Yamada"
+            email: "yamada@example.com"
 ```
 
-### PostgreSQL ステップ
+### 変数置換
+
+- `{testCaseId}`: テストケースの一意ID
+- `{testCaseName}`: テストケース名
+- `{stepId.response.field}`: 前のステップの出力参照
+- `{stepId.response.data.users[0].name}`: 配列要素への参照
+
+### 利用可能なアクション
+
+#### Echo
+入力パラメータをそのまま出力として返します。
 
 ```yaml
-- name: データ挿入
-  id: insert-step
-  kind: PostgreSQL
+- name: Echo test
+  kind: Echo
   params:
-    query: "INSERT INTO users (name, email) VALUES ('Test User', 'test@example.com');"
-    # または
-    fromFile: path/to/query.sql
-  responseAssertion:
-    count: 1  # 影響を受けた行数
+    message: "Hello World"
+    data: { key: "value" }
 ```
 
-### REST API ステップ
+#### Nop
+常に成功するアクション。ステータス確認に使用。
 
 ```yaml
-- name: API呼び出し
-  id: api-call
-  kind: RESTApiExecution
+- name: Success operation
+  kind: Nop
+```
+
+#### Fail
+常に失敗するアクション。エラーハンドリングテストに使用。
+
+```yaml
+- name: Failure test
+  kind: Fail
   params:
-    request:
-      url: "{baseUrl}/api/users"
-      method: POST
-      headers:
-        - content-type: application/json
-        - authorization: Bearer {token}
-      body:
-        name: Test User
-        email: test@example.com
-    responseAssertion:
-      status: 201
-      headers:
-        - content-type: [shouldNotBeNull]
-      body:
-        id: [shouldNotBeNull]
-        name: Test User
+    message: "Intentional failure"
 ```
 
-## アサーション
+## Allureレポート
 
-### 基本的な値の比較
+### レポート生成
 
-```yaml
-responseAssertion:
-  field1: expected_value
-  field2: 
-    nested: value
+テスト実行後、`./allure-results` ディレクトリにJSON形式の結果が出力されます。
+
+### レポート表示
+
+Dockerを使用してAllureレポートサーバーを起動：
+
+```bash
+# Dockerイメージビルド
+docker build -t allure-serve ./allure
+
+# レポートサーバー起動
+docker run -p 8080:8080 -v $(pwd)/allure-results:/app/allure-results allure-serve
 ```
 
-### 特殊アサーション
-
-```yaml
-responseAssertion:
-  field1: [shouldNotBeNull]    # null でないことを確認
-  field2: [shouldBeNull]       # null であることを確認
-  field3: [shouldBeEmpty]      # 空であることを確認
-  field4: [shouldNotBeEmpty]   # 空でないことを確認
-```
-
-### ステップ間のデータ参照
-
-```yaml
-responseAssertion:
-  user_id: [api_step.response.data.id]  # 他のステップの結果を参照
-  status_code: [api_step.response.status]
-```
-
-### テンプレート変数
-
-以下の変数がサポートされています：
-
-- `{baseUrl}` - `--base-url` で指定されたベースURL
-- `{testCaseId}` - `--test-case-id` で指定されたテストケースID
-- `{step_id.response.field}` - 他のステップの結果
-
-## コマンドラインオプション
-
-### `run` コマンド
-
-- `--pg-host <host>` - PostgreSQLホスト (デフォルト: localhost)
-- `--pg-port <port>` - PostgreSQLポート (デフォルト: 5432)
-- `--pg-database <database>` - データベース名
-- `--pg-user <user>` - ユーザー名
-- `--pg-password <password>` - パスワード
-- `--base-url <url>` - REST API のベースURL
-- `--test-case-id <id>` - テストケースID
-
-### `validate` コマンド
-
-YAMLファイルの構文と基本的な構造を検証します。
+http://localhost:8080 でレポートが確認できます。
 
 ## ディレクトリ構造
 
 ```
-yaml-test-engine/
-├── src/
-│   ├── types.ts              # 型定義
-│   ├── assertionEngine.ts    # アサーションエンジン
-│   ├── testEngine.ts         # メインテストエンジン
-│   ├── executors/
-│   │   ├── postgresqlExecutor.ts
-│   │   └── restApiExecutor.ts
-│   └── index.ts              # エントリーポイント
-├── tests/
-│   └── sample.yaml           # サンプルテストケース
-├── sql/
-│   ├── 01-init.sql          # データベース初期化
-│   └── prep2.sql            # サンプルSQLファイル
-├── package.json
-├── tsconfig.json
+src/
+├── actions/           # アクション実装
+│   ├── BaseAction.ts
+│   ├── EchoAction.ts
+│   ├── NopAction.ts
+│   └── FailAction.ts
+├── reporters/         # レポーター実装
+│   ├── BaseReporter.ts
+│   └── AllureReporter.ts
+├── Config.ts          # 設定管理
+├── TestEngine.ts      # メインエンジン
+└── test-runner.ts     # テスト実行スクリプト
+
+test-cases/            # テストケース
+├── echo-sample.yaml
+└── failure-sample.yaml
+
+allure/                # Allureサーバー
 ├── Dockerfile
-├── docker-compose.yml
-└── README.md
+└── entrypoint.sh
+
+config.yaml            # 設定ファイル
+allure-results/        # テスト結果
 ```
 
-## 開発
+## 拡張方法
 
-### 依存関係のインストール
+### カスタムアクション追加
 
-```bash
-npm install
+1. `BaseAction` を継承したクラスを作成
+2. `execute` メソッドを実装
+3. `TestEngine` にアクションを登録
+
+```typescript
+export class CustomAction extends BaseAction {
+  public async execute(step: StepDefinition): Promise<ActionResult> {
+    // カスタムロジック
+    return {
+      success: true,
+      output: { status: 'OK' }
+    };
+  }
+}
+
+// 登録
+engine.registerAction('Custom', new CustomAction());
 ```
 
-### 開発モード
+### カスタムレポーター追加
 
-```bash
-npm run dev run tests/sample.yaml [オプション]
+1. `BaseReporter` を継承したクラスを作成
+2. 必要なメソッドを実装
+
+```typescript
+export class CustomReporter extends BaseReporter {
+  public async reportTestStart(testCaseId: string, testCaseName: string): Promise<void> {
+    // カスタムレポート処理
+  }
+  // 他のメソッドも実装
+}
 ```
 
-### ビルド
+## 技術スタック
 
-```bash
-npm run build
-```
-
-### Docker開発環境
-
-```bash
-# PostgreSQLを起動
-docker-compose up -d postgres
-
-# アプリケーションをビルド
-docker-compose build yaml-test-engine
-
-# テストを実行
-docker-compose run --rm yaml-test-engine run /app/tests/sample.yaml \
-  --pg-host postgres \
-  --pg-database testdb \
-  --pg-user testuser \
-  --pg-password testpass
-```
-
-## トラブルシューティング
-
-### PostgreSQL接続エラー
-
-1. PostgreSQLが起動していることを確認
-2. 接続情報（ホスト、ポート、データベース名、認証情報）が正しいことを確認
-3. ファイアウォールやネットワーク設定を確認
-
-### REST API呼び出しエラー
-
-1. ベースURLが正しいことを確認
-2. APIサーバーが起動していることを確認
-3. ネットワーク接続を確認
-
-### YAML構文エラー
-
-1. `validate` コマンドでYAMLファイルを検証
-2. インデントがスペースで統一されていることを確認
-3. 必須フィールドが設定されていることを確認
+- **TypeScript**: メイン開発言語
+- **yamljs**: YAML解析
+- **allure-js-commons**: テストレポート生成
+- **uuid**: 一意ID生成
+- **Docker**: レポートサーバー
 
 ## ライセンス
 
-MIT License
+ISC
