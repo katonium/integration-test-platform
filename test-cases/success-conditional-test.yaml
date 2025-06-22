@@ -1,0 +1,29 @@
+kind: TestCase/v0
+name: Successful Conditional Test
+step:
+- name: Always executed step
+  id: always-step
+  kind: Echo
+  if: always()
+  params:
+    message: "This step always executes"
+
+- name: Success step
+  id: success-step
+  kind: Echo
+  if: success()
+  params:
+    message: "This step executes when successful"
+
+- name: Should be skipped (failure condition)
+  id: skipped-failure
+  kind: Echo
+  if: failure()
+  params:
+    message: "This should be skipped because test is successful"
+
+- name: Final success step
+  id: final-step
+  kind: Echo
+  params:
+    message: "This executes with default success() behavior"

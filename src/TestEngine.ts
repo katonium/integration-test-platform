@@ -54,7 +54,9 @@ export class TestEngine {
       
       // Evaluate if condition
       if (!this.shouldExecuteStep(processedStep, testSuccess)) {
-        console.log(`  Step ${processedStep.id} (${processedStep.kind}): SKIPPED (condition: ${processedStep.if})`);
+        const reason = processedStep.if ? `Condition: ${processedStep.if}` : 'Condition: success() (default)';
+        console.log(`  Step ${processedStep.id} (${processedStep.kind}): SKIPPED (${reason})`);
+        await this.reporter.reportStepSkipped(processedStep.id, processedStep.name, processedStep.kind, reason);
         continue;
       }
       

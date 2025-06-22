@@ -61,7 +61,7 @@ jobs:
       - name: Run all test manifests
         run: |
           echo "=== Running all test manifests ==="
-          npm test test-cases/success-sample.yaml test-cases/echo-sample.yaml
+          npm test test-cases/success-sample.yaml test-cases/echo-sample.yaml test-cases/success-conditional-test.yaml
 
       - name: Generate Allure single HTML report
         if: always()

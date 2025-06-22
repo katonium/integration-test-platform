@@ -67,6 +67,33 @@ export class AllureReporter extends BaseReporter {
     }
   }
 
+  public async reportStepSkipped(stepId: string, stepName: string, kind: string, reason: string): Promise<void> {
+    const step: StepResult = {
+      name: stepName,
+      start: Date.now(),
+      stop: Date.now(),
+      status: Status.SKIPPED,
+      stage: 'finished' as any,
+      steps: [],
+      attachments: [],
+      parameters: [
+        {
+          name: 'Skip Reason',
+          value: reason
+        },
+        {
+          name: 'Action Kind',
+          value: kind
+        }
+      ],
+      statusDetails: {
+        message: `Step skipped: ${reason}`
+      }
+    };
+
+    this.currentSteps.push(step);
+  }
+
   public async reportTestEnd(testCaseId: string, success: boolean): Promise<void> {
     if (this.currentTest) {
       this.currentTest.stop = Date.now();
