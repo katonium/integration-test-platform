@@ -27,6 +27,8 @@ This platform provides the following features:
 - `EchoAction`: Action that returns the input as output
 - `NopAction`: Action that always succeeds  
 - `FailAction`: Action that always fails
+- `RestApiCallAction`: Performs REST API calls with validation
+- `PostgreSQLAction`: Executes PostgreSQL queries and transactions
 
 #### Reporters
 - `BaseReporter`: Abstract class for reporting
@@ -117,8 +119,45 @@ step:
 
 - `{testCaseId}`: Unique ID of the test case
 - `{testCaseName}`: Name of the test case
-- `{stepId.response.field}`: Reference output from a previous step
-- `{stepId.response.data.users[0].name}`: Reference to an array element
+- `{stepId.output.result.field}`: Reference output from a previous step
+- `{stepId.output.result.rows[0].id}`: Reference to array elements in results
+
+### Conditional Execution
+
+Control step execution based on test status using the `if` condition:
+
+- `if: always()`: Execute regardless of test status (for cleanup steps)
+- `if: success()`: Execute only when test is currently successful
+- `if: failure()`: Execute only when test has failed
+- No `if` condition: Defaults to `success()` behavior
+
+```yaml
+- name: Setup step
+  kind: Echo
+  params:
+    message: "Setup"
+  # No if condition = success() behavior
+
+- name: Main test
+  id: main-test
+  kind: RestApiCall
+  if: success()
+  params:
+    url: "http://api.example.com/test"
+
+- name: Cleanup on failure
+  kind: PostgreSQL
+  if: failure()
+  params:
+    query: "DELETE FROM temp_data WHERE test_id = $1"
+    values: ["{testCaseId}"]
+
+- name: Always cleanup
+  kind: Echo
+  if: always()
+  params:
+    message: "Test completed"
+```
 
 ### Available Actions
 
@@ -151,6 +190,60 @@ Action that always fails. Used for error handling tests.
     message: "Intentional failure"
 ```
 
+#### RestApiCall
+Performs REST API calls with request/response validation.
+
+```yaml
+- name: Call REST API
+  kind: RestApiCall
+  params:
+    url: "http://localhost:8080/api/users"
+    method: POST
+    headers:
+      Content-Type: application/json
+      Authorization: "Bearer token"
+    queryParams:
+      limit: 10
+    body:
+      name: "John Doe"
+      email: "john@example.com"
+  responseValidation:
+    statusCode: 201
+    headers:
+      Content-Type: application/json
+    body:
+      id: 123
+      name: "John Doe"
+```
+
+#### PostgreSQL
+Executes PostgreSQL queries and transactions.
+
+```yaml
+# Single query
+- name: Insert user
+  kind: PostgreSQL
+  params:
+    query: "INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id"
+    values:
+      - "John Doe"
+      - "john@example.com"
+  responseValidation:
+    rowsAffected: 1
+
+# Multiple queries (transaction)
+- name: Create user and order
+  kind: PostgreSQL
+  params:
+    queries:
+      - query: "INSERT INTO users (name) VALUES ($1) RETURNING id"
+        values: ["John Doe"]
+      - query: "INSERT INTO orders (user_id, product) VALUES ($1, $2)"
+        values: ["{prev.result.rows[0].id}", "Laptop"]
+  responseValidation:
+    rowsAffected: 2
+```
+
 ## Allure Report
 
 ### Report Generation
@@ -170,6 +263,23 @@ docker run -p 8080:8080 -v $(pwd)/allure-results:/app/allure-results allure-serv
 ```
 
 You can view the report at http://localhost:8080.
+
+### Single HTML Report
+
+Generate a single HTML file containing all report assets:
+
+```bash
+# Build the Allure generator image
+docker build -t allure-generator ./allure
+
+# Generate single HTML report
+docker run --rm \
+  -v "$(pwd)/allure-results:/app/allure-results" \
+  -v "$(pwd)/allure-report:/app/allure-report" \
+  allure-generator generate
+
+# The report will be in allure-report/index.html
+```
 
 ## Directory Structure
 
@@ -197,7 +307,58 @@ allure/                # Allure server
 
 config.yaml            # Configuration file
 allure-results/        # Test results
+docker-compose.yml     # Docker services
+init-db.sql           # Database initialization
+tools/                # Additional tools
+├── echo-server/      # Go echo server
+│   ├── main.go
+│   └── Dockerfile
 ```
+
+## Docker Environment
+
+### Services
+
+Start the complete testing environment:
+
+```bash
+# Start PostgreSQL and echo server
+docker-compose up -d
+
+# Check services are running
+docker ps
+```
+
+**Available services:**
+- **PostgreSQL**: Database server on port 5432
+- **Echo Server**: REST API echo server on port 8080
+
+### Configuration
+
+Database connection settings in `config.yaml`:
+
+```yaml
+actions:
+  postgresql:
+    host: localhost
+    port: 5432
+    database: testdb
+    schema: test_schema
+    user: test_app_user
+    password: app_password
+```
+
+## CI/CD Pipeline
+
+GitHub Actions workflow provides:
+
+- **Automated Testing**: Runs integration tests on every push/PR
+- **Docker Environment**: Builds and starts all services
+- **Allure Reports**: Generates single HTML reports
+- **GitHub Pages**: Deploys reports automatically
+- **Artifact Upload**: Test results and HTML reports
+
+View the workflow in `.github/workflows/ci.yml`.
 
 ## How to Extend
 
@@ -242,4 +403,7 @@ export class CustomReporter extends BaseReporter {
 - **yamljs**: YAML parsing
 - **allure-js-commons**: Test report generation
 - **uuid**: Unique ID generation
-- **Docker**: Report server
+- **pg**: PostgreSQL client
+- **Docker**: Containerization and services
+- **Go**: Echo server implementation
+- **GitHub Actions**: CI/CD pipeline
