@@ -56,13 +56,13 @@ jobs:
       - name: Run integration tests
         run: |
           echo "=== Running integration tests ==="
-          npm test test-cases/integration-test.yaml
+          npm test test-cases/success-sample.yaml
           
       - name: Run all test manifests
         run: |
           echo "=== Running all test manifests ==="
-          npm test test-cases/integration-test.yaml test-cases/echo-sample.yaml
-          
+          npm test test-cases/success-sample.yaml test-cases/echo-sample.yaml
+
       - name: Generate Allure single HTML report
         if: always()
         run: |
