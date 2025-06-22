@@ -3,6 +3,14 @@ database:
   host: "localhost"
   port: 5432
   name: "testdb"
+actions:
+  postgresql:
+    host: localhost
+    port: 5432
+    database: testdb
+    schema: test_schema
+    user: test_app_user
+    password: app_password
 api:
   timeout: 30000
   retries: 3

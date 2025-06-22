@@ -1,6 +1,11 @@
 import { TestEngine } from './TestEngine';
 import { AllureReporter } from './reporters/AllureReporter';
 import { Config } from './Config';
+import { EchoAction } from './actions/EchoAction';
+import { NopAction } from './actions/NopAction';
+import { FailAction } from './actions/FailAction';
+import { RestApiCallAction } from './actions/RestApiAction';
+import { PostgreSQLAction } from './actions/PostgreSQLAction';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -55,8 +60,18 @@ async function runTests() {
     // Initialize reporter
     const reporter = new AllureReporter('./allure-results');
     
+    // Load configuration
+    Config.load('./config.yaml');
+
     // Initialize engine with config
-    const engine = new TestEngine(reporter, './config.yaml');
+    const engine = new TestEngine(reporter);
+    
+    // Register all actions
+    engine.registerAction('Echo', new EchoAction());
+    engine.registerAction('Nop', new NopAction());
+    engine.registerAction('Fail', new FailAction());
+    engine.registerAction('RestApiCall', new RestApiCallAction());
+    engine.registerAction('PostgreSQL', new PostgreSQLAction());
     
     console.log('📝 Configuration loaded:');
     console.log(`  Base URL: ${Config.get('baseUrl')}`);
@@ -97,6 +112,9 @@ async function runTests() {
         }
       } catch (error) {
         console.error(`💥 ${relativePath}: ERROR - ${error instanceof Error ? error.message : 'Unknown error'}`);
+        if (error instanceof Error && error.stack) {
+          console.error('Stack trace:', error.stack);
+        }
         totalFailed++;
       }
     }

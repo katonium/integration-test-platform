@@ -22,8 +22,10 @@
   "homepage": "https://github.com/katonium/integration-test-platform#readme",
   "dependencies": {
     "@types/node": "^24.0.1",
+    "@types/pg": "^8.15.4",
     "@types/uuid": "^10.0.0",
     "allure-js-commons": "^3.2.2",
+    "pg": "^8.16.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3",
     "uuid": "^11.1.0",

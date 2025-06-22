@@ -1,5 +1,4 @@
-kind: TestCase
-version: "1.1"
+kind: TestCase/v0
 name: sample test case
 step:
 - name: prepare data 1
@@ -31,11 +30,17 @@ step:
     responseAssertion:
       stats: 200
       headers:
-      - content-type: [shouldNotBeNull]
-      - x-testcase-id: [shouldBeNull]
+      - content-type: [!null]
+      - x-testcase-id: [!null]
+      - x-invalid-header: [null]
       body:
-        message: [shouldNotBeNull]
-        sample: OK
+        message: [null]
+        hello: world
+        sample:
+          sample2:
+          - this
+          - is
+          - array
 - name: validation table
   id: valid-1
   kind: PostgreSQL

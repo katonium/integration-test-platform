@@ -39,3 +39,20 @@ tasks:
     desc: stop allure report server
     cmds:
       - docker stop allure-serve || true
+
+  stub:run:
+    desc: run stub server
+    cmds:
+      - docker composet up --build
+
+  stub:down:
+    desc: stop stub server
+    cmds:
+      - docker compose down
+
+  stub:runEchoServer:
+    desc: run stub server
+    dir: tools/echo-server
+    cmds:
+      - go run main.go
+

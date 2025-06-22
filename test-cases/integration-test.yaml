@@ -1,0 +1,102 @@
+kind: TestCase/v0
+name: Integration Test - REST API and PostgreSQL
+step:
+- name: Cleanup old test data
+  id: cleanup-old
+  kind: PostgreSQL
+  params:
+    query: "DELETE FROM test_schema.users WHERE email = $1"
+    values:
+      - 'testuser@example.com'
+
+- name: Setup test data
+  id: setup-data
+  kind: PostgreSQL
+  params:
+    query: "INSERT INTO test_schema.users (name, email, age) VALUES ($1, $2, $3) RETURNING id"
+    values:
+      - 'Test User'
+      - 'testuser@example.com'
+      - 28
+  responseValidation:
+    rowsAffected: 1
+
+- name: Call REST API to echo data
+  id: api-call
+  kind: RestApiCall
+  params:
+    url: "http://localhost:8080/echo"
+    method: POST
+    headers:
+      Content-Type: application/json
+      X-Test-Case-ID: "{testCaseId}"
+      X-User-ID: "{setup-data.output.result.rows[0].id}"
+    body:
+      message: "Hello from integration test"
+      userId: "{setup-data.output.result.rows[0].id}"
+      timestamp: "2024-01-01T00:00:00Z"
+  responseValidation:
+    statusCode: 200
+    headers:
+      Content-Type: application/json
+    body:
+      message: "Hello from integration test"
+
+- name: Verify user data in database
+  id: verify-user
+  kind: PostgreSQL
+  params:
+    query: "SELECT name, email, age FROM test_schema.users WHERE email = $1"
+    values:
+      - 'testuser@example.com'
+  responseValidation:
+    - name: 'Test User'
+      email: 'testuser@example.com'
+      age: 28
+
+- name: Create order for user
+  id: create-order
+  kind: PostgreSQL
+  params:
+    queries:
+      - query: "INSERT INTO test_schema.orders (user_id, product_name, quantity, price) VALUES ($1, $2, $3, $4)"
+        values:
+          - "{setup-data.output.result.rows[0].id}"
+          - 'Test Product'
+          - 2
+          - 49.99
+      - query: "SELECT COUNT(*) as order_count FROM test_schema.orders WHERE user_id = $1"
+        values:
+          - "{setup-data.output.result.rows[0].id}"
+  responseValidation:
+    - order_count: 1
+
+- name: Call API with order information
+  id: api-order-call
+  kind: RestApiCall
+  params:
+    url: "http://localhost:8080/order"
+    method: POST
+    headers:
+      Content-Type: application/json
+      X-Order-ID: "{create-order.output.result.lastQuery.rows[0].order_count}"
+    body:
+      orderId: "{create-order.output.result.lastQuery.rows[0].order_count}"
+      userId: "{setup-data.output.result.rows[0].id}"
+      status: "created"
+  responseValidation:
+    statusCode: 200
+
+- name: Cleanup test data
+  id: cleanup
+  kind: PostgreSQL
+  params:
+    queries:
+      - query: "DELETE FROM test_schema.orders WHERE user_id = $1"
+        values:
+          - "{setup-data.output.result.rows[0].id}"
+      - query: "DELETE FROM test_schema.users WHERE email = $1"
+        values:
+          - 'testuser@example.com'
+  responseValidation:
+    rowsAffected: 2

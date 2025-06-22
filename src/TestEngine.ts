@@ -2,9 +2,6 @@ import * as YAML from 'yamljs';
 import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { BaseAction, StepDefinition, ActionResult } from './actions/BaseAction';
-import { EchoAction } from './actions/EchoAction';
-import { NopAction } from './actions/NopAction';
-import { FailAction } from './actions/FailAction';
 import { BaseReporter } from './reporters/BaseReporter';
 import { Config } from './Config';
 
@@ -25,20 +22,9 @@ export class TestEngine {
   private actions: Map<string, BaseAction>;
   private reporter: BaseReporter;
 
-  constructor(reporter: BaseReporter, configPath?: string) {
+  constructor(reporter: BaseReporter) {
     this.reporter = reporter;
     this.actions = new Map();
-    this.registerDefaultActions();
-    
-    if (configPath) {
-      Config.load(configPath);
-    }
-  }
-
-  private registerDefaultActions(): void {
-    this.actions.set('Echo', new EchoAction());
-    this.actions.set('Nop', new NopAction());
-    this.actions.set('Fail', new FailAction());
   }
 
   public registerAction(kind: string, action: BaseAction): void {
@@ -73,6 +59,14 @@ export class TestEngine {
       try {
         const result = await action.execute(processedStep);
         stepResults.set(processedStep.id, result);
+        
+        // Debug logging
+        console.log(`  Step ${processedStep.id} (${processedStep.kind}): ${result.success ? 'SUCCESS' : 'FAILED'}`);
+        if (!result.success) {
+          console.log(`    Error: ${JSON.stringify(result.output, null, 2)}`);
+        } else {
+          console.log(`    Result structure: ${JSON.stringify(result.output, null, 2)}`);
+        }
         
         await this.reporter.reportStepEnd(processedStep.id, result.success, result.output);
 
@@ -146,6 +140,26 @@ export class TestEngine {
     };
 
     return replaceVariables(processedStep);
+  }
+
+  public async executeTestStep(step: StepDefinition): Promise<ActionResult> {
+    const action = this.actions.get(step.kind);
+    if (!action) {
+      throw new Error(`Unknown action kind: ${step.kind}`);
+    }
+
+    try {
+      const result = await action.execute(step);
+      return result;
+    } catch (error) {
+      return {
+        success: false,
+        output: {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined
+        }
+      };
+    }
   }
 
   public async generateReport(): Promise<void> {

@@ -1,80 +1,80 @@
 # Integration Test Platform
 
-TypeScriptで実装されたYAMLベースのテストワークフロー実行エンジンです。
+A YAML-based test workflow execution engine implemented in TypeScript.
 
-## 概要
+## Overview
 
-このプラットフォームは以下の機能を提供します：
+This platform provides the following features:
 
-- YAMLで記述されたテストケースの実行
-- 拡張可能なアクションシステム
-- ステップ間での出力データ共有
-- 設定管理とテンプレート変数機能
-- Allureレポート生成
-- Dockerでのレポート表示
+- Execution of test cases written in YAML
+- Extensible action system
+- Sharing of output data between steps
+- Configuration management and template variable functionality
+- Allure report generation
+- Report viewing with Docker
 
-## アーキテクチャ
+## Architecture
 
-### コアコンポーネント
+### Core Components
 
 #### TestEngine
-- YAMLテストケースの解析と実行
-- アクションの管理と実行
-- 変数置換とコンテキスト管理
+- Parses and executes YAML test cases
+- Manages and executes actions
+- Variable substitution and context management
 
 #### Actions
-- `BaseAction`: 統一インターフェースを持つ抽象クラス
-- `EchoAction`: 入力をそのまま出力として返すアクション
-- `NopAction`: 常に成功するアクション  
-- `FailAction`: 常に失敗するアクション
+- `BaseAction`: Abstract class with a unified interface
+- `EchoAction`: Action that returns the input as output
+- `NopAction`: Action that always succeeds  
+- `FailAction`: Action that always fails
 
 #### Reporters
-- `BaseReporter`: レポーティングの抽象クラス
-- `AllureReporter`: Allureレポート生成機能
+- `BaseReporter`: Abstract class for reporting
+- `AllureReporter`: Allure report generation functionality
 
 #### Config
-- YAML設定ファイルの読み込み
-- 環境変数による設定オーバーライド
-- `Config.get("key.subKey")` インターフェース
+- Loads YAML configuration files
+- Overrides settings via environment variables
+- `Config.get("key.subKey")` interface
 
-## セットアップ
+## Setup
 
-### 依存関係のインストール
+### Install dependencies
 
 ```bash
 npm install
 ```
 
-### TypeScriptコンパイル
+### TypeScript compilation
 
 ```bash
 npm run build
 ```
 
-## 使用方法
+## Usage
 
-### テスト実行
+### Running tests
 
 ```bash
-# 全てのテストファイルを実行（デフォルト: test-cases/）
+# Run all test files (default: test-cases/)
 npm test
 
-# 特定のファイルを実行
+# Run a specific file
 npm test test-cases/echo-sample.yaml
 
-# 複数のファイルを実行
+# Run multiple files
 npm test test-cases/echo-sample.yaml test-cases/failure-sample.yaml
 
-# 特定のディレクトリ内の全てのテストを実行
+# Run all tests in a specific directory
 npm test test-cases/
 
-# 複数のディレクトリやファイルを組み合わせて実行
+# Combine multiple directories and files
 npm test test-cases/echo-sample.yaml test-cases/subfolder/
 ```
 
-### 設定ファイル
+### Configuration file
 
-`config.yaml` でベース設定を定義：
+Define base settings in `config.yaml`:
 
 ```yaml
 baseUrl: "http://localhost:8080"
@@ -87,15 +87,15 @@ api:
   retries: 3
 ```
 
-### 環境変数での設定オーバーライド
+### Override settings with environment variables
 
 ```bash
 DATABASE_HOST=test-db npm test
 ```
 
-## テストケースの書き方
+## Writing Test Cases
 
-### 基本構造
+### Basic Structure
 
 ```yaml
 kind: TestCase
@@ -113,17 +113,17 @@ step:
             email: "yamada@example.com"
 ```
 
-### 変数置換
+### Variable Substitution
 
-- `{testCaseId}`: テストケースの一意ID
-- `{testCaseName}`: テストケース名
-- `{stepId.response.field}`: 前のステップの出力参照
-- `{stepId.response.data.users[0].name}`: 配列要素への参照
+- `{testCaseId}`: Unique ID of the test case
+- `{testCaseName}`: Name of the test case
+- `{stepId.response.field}`: Reference output from a previous step
+- `{stepId.response.data.users[0].name}`: Reference to an array element
 
-### 利用可能なアクション
+### Available Actions
 
 #### Echo
-入力パラメータをそのまま出力として返します。
+Returns the input parameters as output.
 
 ```yaml
 - name: Echo test
@@ -134,7 +134,7 @@ step:
 ```
 
 #### Nop
-常に成功するアクション。ステータス確認に使用。
+Action that always succeeds. Used for status checks.
 
 ```yaml
 - name: Success operation
@@ -142,7 +142,7 @@ step:
 ```
 
 #### Fail
-常に失敗するアクション。エラーハンドリングテストに使用。
+Action that always fails. Used for error handling tests.
 
 ```yaml
 - name: Failure test
@@ -151,66 +151,66 @@ step:
     message: "Intentional failure"
 ```
 
-## Allureレポート
+## Allure Report
 
-### レポート生成
+### Report Generation
 
-テスト実行後、`./allure-results` ディレクトリにJSON形式の結果が出力されます。
+After running tests, results in JSON format are output to the `./allure-results` directory.
 
-### レポート表示
+### Viewing Reports
 
-Dockerを使用してAllureレポートサーバーを起動：
+Start the Allure report server using Docker:
 
 ```bash
-# Dockerイメージビルド
+# Build Docker image
 docker build -t allure-serve ./allure
 
-# レポートサーバー起動
+# Start the report server
 docker run -p 8080:8080 -v $(pwd)/allure-results:/app/allure-results allure-serve
 ```
 
-http://localhost:8080 でレポートが確認できます。
+You can view the report at http://localhost:8080.
 
-## ディレクトリ構造
+## Directory Structure
 
 ```
 src/
-├── actions/           # アクション実装
+├── actions/           # Action implementations
 │   ├── BaseAction.ts
 │   ├── EchoAction.ts
 │   ├── NopAction.ts
 │   └── FailAction.ts
-├── reporters/         # レポーター実装
+├── reporters/         # Reporter implementations
 │   ├── BaseReporter.ts
 │   └── AllureReporter.ts
-├── Config.ts          # 設定管理
-├── TestEngine.ts      # メインエンジン
-└── test-runner.ts     # テスト実行スクリプト
+├── Config.ts          # Configuration management
+├── TestEngine.ts      # Main engine
+└── test-runner.ts     # Test runner script
 
-test-cases/            # テストケース
+test-cases/            # Test cases
 ├── echo-sample.yaml
 └── failure-sample.yaml
 
-allure/                # Allureサーバー
+allure/                # Allure server
 ├── Dockerfile
 └── entrypoint.sh
 
-config.yaml            # 設定ファイル
-allure-results/        # テスト結果
+config.yaml            # Configuration file
+allure-results/        # Test results
 ```
 
-## 拡張方法
+## How to Extend
 
-### カスタムアクション追加
+### Adding Custom Actions
 
-1. `BaseAction` を継承したクラスを作成
-2. `execute` メソッドを実装
-3. `TestEngine` にアクションを登録
+1. Create a class that extends `BaseAction`
+2. Implement the `execute` method
+3. Register the action in `TestEngine`
 
 ```typescript
 export class CustomAction extends BaseAction {
   public async execute(step: StepDefinition): Promise<ActionResult> {
-    // カスタムロジック
+    // Custom logic
     return {
       success: true,
       output: { status: 'OK' }
@@ -218,32 +218,28 @@ export class CustomAction extends BaseAction {
   }
 }
 
-// 登録
+// Registration
 engine.registerAction('Custom', new CustomAction());
 ```
 
-### カスタムレポーター追加
+### Adding Custom Reporters
 
-1. `BaseReporter` を継承したクラスを作成
-2. 必要なメソッドを実装
+1. Create a class that extends `BaseReporter`
+2. Implement the required methods
 
 ```typescript
 export class CustomReporter extends BaseReporter {
   public async reportTestStart(testCaseId: string, testCaseName: string): Promise<void> {
-    // カスタムレポート処理
+    // Custom report processing
   }
-  // 他のメソッドも実装
+  // Implement other methods as needed
 }
 ```
 
-## 技術スタック
+## Tech Stack
 
-- **TypeScript**: メイン開発言語
-- **yamljs**: YAML解析
-- **allure-js-commons**: テストレポート生成
-- **uuid**: 一意ID生成
-- **Docker**: レポートサーバー
-
-## ライセンス
-
-ISC
+- **TypeScript**: Main development language
+- **yamljs**: YAML parsing
+- **allure-js-commons**: Test report generation
+- **uuid**: Unique ID generation
+- **Docker**: Report server
