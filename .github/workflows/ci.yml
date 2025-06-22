@@ -1,0 +1,128 @@
+name: CI Pipeline
+
+on:
+  push:
+
+jobs:
+  test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Build TypeScript
+        run: npm run build
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Build and start services
+        run: |
+          docker-compose build
+          docker-compose up -d
+          
+      - name: Wait for services to be ready
+        run: |
+          echo "Waiting for PostgreSQL to be ready..."
+          timeout 60 bash -c 'until docker exec test-postgres pg_isready -U testuser -d testdb; do sleep 2; done'
+          
+          echo "Waiting for echo server to be ready..."
+          timeout 60 bash -c 'until curl -f http://localhost:8080/health 2>/dev/null || curl -f http://localhost:8080/ 2>/dev/null; do sleep 2; done'
+          
+      - name: Verify services
+        run: |
+          echo "=== Docker containers status ==="
+          docker ps
+          
+          echo "=== Testing PostgreSQL connection ==="
+          docker exec test-postgres psql -U testuser -d testdb -c "SELECT current_database(), current_user;"
+          
+          echo "=== Testing echo server ==="
+          curl -X POST http://localhost:8080/test \
+            -H "Content-Type: application/json" \
+            -d '{"message": "CI test"}' || echo "Echo server test failed"
+            
+      - name: Run integration tests
+        run: |
+          echo "=== Running integration tests ==="
+          npm test test-cases/integration-test.yaml
+          
+      - name: Run all test manifests
+        run: |
+          echo "=== Running all test manifests ==="
+          npm test test-cases/
+          
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: allure-results
+          path: allure-results/
+          retention-days: 30
+          
+      - name: Upload test logs
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: docker-logs
+          path: |
+            docker-compose logs
+          retention-days: 7
+          
+      - name: Collect docker logs on failure
+        if: failure()
+        run: |
+          echo "=== Docker logs for debugging ==="
+          docker-compose logs postgres
+          docker-compose logs echo-server
+          
+      - name: Clean up
+        if: always()
+        run: |
+          docker-compose down -v
+          docker system prune -f
+          
+  build-docker-images:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Build echo server image
+        run: |
+          docker build -t echo-server:latest ./tools/echo-server
+          
+      - name: Test echo server image
+        run: |
+          docker run -d --name test-echo -p 8081:8080 echo-server:latest
+          sleep 5
+          curl -X POST http://localhost:8081/test \
+            -H "Content-Type: application/json" \
+            -d '{"test": "docker image"}' || echo "Image test failed"
+          docker stop test-echo
+          docker rm test-echo
+          
+      - name: Build test environment
+        run: |
+          docker-compose build --no-cache
+          
+      - name: Clean up
+        if: always()
+        run: |
+          docker system prune -f
