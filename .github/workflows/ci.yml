@@ -29,8 +29,8 @@ jobs:
         
       - name: Build and start services
         run: |
-          docker-compose build
-          docker-compose up -d
+          docker compose build
+          docker compose up -d
           
       - name: Wait for services to be ready
         run: |
@@ -77,20 +77,20 @@ jobs:
         with:
           name: docker-logs
           path: |
-            docker-compose logs
+            docker compose logs
           retention-days: 7
           
       - name: Collect docker logs on failure
         if: failure()
         run: |
           echo "=== Docker logs for debugging ==="
-          docker-compose logs postgres
-          docker-compose logs echo-server
+          docker compose logs postgres
+          docker compose logs echo-server
           
       - name: Clean up
         if: always()
         run: |
-          docker-compose down -v
+          docker compose down -v
           docker system prune -f
           
   build-docker-images:
@@ -120,7 +120,7 @@ jobs:
           
       - name: Build test environment
         run: |
-          docker-compose build --no-cache
+          docker compose build --no-cache
           
       - name: Clean up
         if: always()
