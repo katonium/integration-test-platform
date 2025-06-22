@@ -8,6 +8,7 @@ export interface StepDefinition {
   id: string;
   kind: string;
   params?: any;
+  if?: string;
 }
 
 export abstract class BaseAction {

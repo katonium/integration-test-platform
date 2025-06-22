@@ -1,0 +1,49 @@
+kind: TestCase/v0
+name: Conditional Execution Test
+step:
+- name: Always executed step
+  id: always-step
+  kind: Echo
+  if: always()
+  params:
+    message: "This step always executes"
+
+- name: Success only step
+  id: success-step
+  kind: Echo
+  if: success()
+  params:
+    message: "This step only executes when test is successful"
+
+- name: Intentional failure
+  id: fail-step
+  kind: Fail
+  params:
+    message: "This step will fail the test"
+
+- name: Should be skipped (success condition)
+  id: skipped-success
+  kind: Echo
+  if: success()
+  params:
+    message: "This should be skipped because test failed"
+
+- name: Failure cleanup step
+  id: failure-cleanup
+  kind: Echo
+  if: failure()
+  params:
+    message: "This step executes because test failed"
+
+- name: Always cleanup step
+  id: always-cleanup
+  kind: Echo
+  if: always()
+  params:
+    message: "This cleanup step always executes"
+
+- name: Default behavior (no if condition)
+  id: default-step
+  kind: Echo
+  params:
+    message: "This should be skipped (default success() behavior)"

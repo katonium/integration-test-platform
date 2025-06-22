@@ -35,6 +35,9 @@ export class TestEngine {
     const yamlContent = fs.readFileSync(yamlFilePath, 'utf8');
     const testCase: TestCase = YAML.parse(yamlContent);
 
+    // Validate if conditions before starting the test
+    this.validateIfConditions(testCase);
+
     const executionContext: ExecutionContext = {
       testCaseId: context.testCaseId || uuidv4(),
       testCaseName: testCase.name,
@@ -48,6 +51,12 @@ export class TestEngine {
 
     for (const step of testCase.step) {
       const processedStep = this.processStepVariables(step, executionContext, stepResults);
+      
+      // Evaluate if condition
+      if (!this.shouldExecuteStep(processedStep, testSuccess)) {
+        console.log(`  Step ${processedStep.id} (${processedStep.kind}): SKIPPED (condition: ${processedStep.if})`);
+        continue;
+      }
       
       await this.reporter.reportStepStart(processedStep.id, processedStep.name, processedStep.kind);
 
@@ -72,7 +81,7 @@ export class TestEngine {
 
         if (!result.success) {
           testSuccess = false;
-          break;
+          // Don't break here anymore - let remaining steps with if conditions execute
         }
       } catch (error) {
         const errorResult: ActionResult = {
@@ -85,7 +94,7 @@ export class TestEngine {
         stepResults.set(processedStep.id, errorResult);
         await this.reporter.reportStepEnd(processedStep.id, false, errorResult.output);
         testSuccess = false;
-        break;
+        // Don't break here anymore - let remaining steps with if conditions execute
       }
     }
 
@@ -159,6 +168,40 @@ export class TestEngine {
           stack: error instanceof Error ? error.stack : undefined
         }
       };
+    }
+  }
+
+  private validateIfConditions(testCase: TestCase): void {
+    const validConditions = ['always()', 'success()', 'failure()'];
+    
+    for (const step of testCase.step) {
+      if (step.if) {
+        const condition = step.if.toLowerCase().trim();
+        if (!validConditions.includes(condition)) {
+          throw new Error(`Invalid if condition '${step.if}' in step '${step.id}'. Valid conditions are: ${validConditions.join(', ')}`);
+        }
+      }
+    }
+  }
+
+  private shouldExecuteStep(step: StepDefinition, currentTestSuccess: boolean): boolean {
+    // If no condition specified, treat as success() (only execute if test is currently successful)
+    if (!step.if) {
+      return currentTestSuccess;
+    }
+
+    const condition = step.if.toLowerCase().trim();
+    
+    switch (condition) {
+      case 'always()':
+        return true;
+      case 'success()':
+        return currentTestSuccess;
+      case 'failure()':
+        return !currentTestSuccess;
+      default:
+        // This should never happen due to validation, but just in case
+        throw new Error(`Invalid condition: ${step.if}`);
     }
   }
 
