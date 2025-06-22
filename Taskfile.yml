@@ -31,6 +31,12 @@ tasks:
     cmds:
       - docker build -t allure-serve ./allure
 
+  allure:generate:
+    desc: generate allure report
+    cmds:
+      - sudo rm -r allure-report || true
+      - docker run --rm -v "$(pwd)/allure-results:/app/allure-results" -v "$(pwd)/allure-report:/app/allure-report" allure-generator generate
+
   allure:dockerRun:  # テスト結果をマウントしてサーバー起動
     cmds:
       - docker run --rm --name allure-serve -p 8083:8083 -v $(pwd)/allure-results:/app/allure-results allure-serve

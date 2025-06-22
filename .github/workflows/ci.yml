@@ -61,9 +61,40 @@ jobs:
       - name: Run all test manifests
         run: |
           echo "=== Running all test manifests ==="
-          npm test test-cases/
+          npm test test-cases/integration-test.yaml test-cases/echo-sample.yaml
           
-      - name: Upload test results
+      - name: Generate Allure single HTML report
+        if: always()
+        run: |
+          echo "=== Building Allure Docker image ==="
+          docker build -t allure-generator ./allure
+          
+          echo "=== Generating single HTML report ==="
+          docker run --rm \
+            -v "$(pwd)/allure-results:/app/allure-results" \
+            -v "$(pwd)/allure-report:/app/allure-report" \
+            allure-generator generate
+            
+          echo "=== Generated files ==="
+          ls -la allure-report/
+            
+      - name: Upload Allure HTML report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: allure-html-report
+          path: allure-report/
+          retention-days: 30
+          
+      - name: Deploy to GitHub Pages
+        if: always() && github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./allure-report
+          destination_dir: reports
+          
+      - name: Upload raw test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
