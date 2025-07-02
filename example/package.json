@@ -4,9 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "cd example && npm test",
-    "build": "cd example && npm run build",
-    "start": "cd example && npm start"
+    "test": "ts-node src/test-runner.ts",
+    "build": "tsc",
+    "start": "node dist/test-runner.js"
   },
   "repository": {
     "type": "git",

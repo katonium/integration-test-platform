@@ -19,7 +19,7 @@ jobs:
           cache: 'npm'
           
       - name: Install dependencies
-        run: npm ci
+        run: cd example && npm ci
         
       - name: Build TypeScript
         run: npm run build
@@ -29,6 +29,7 @@ jobs:
         
       - name: Build and start services
         run: |
+          cd example
           docker compose build
           docker compose up -d
           
@@ -55,17 +56,23 @@ jobs:
             
       - name: Run integration tests
         run: |
+          cd example
+
           echo "=== Running integration tests ==="
           npm test test-cases/success-sample.yaml
           
       - name: Run all test manifests
         run: |
+          cd example
+
           echo "=== Running all test manifests ==="
           npm test test-cases/success-sample.yaml test-cases/echo-sample.yaml test-cases/success-conditional-test.yaml
 
       - name: Generate Allure single HTML report
         if: always()
         run: |
+          cd example
+
           echo "=== Building Allure Docker image ==="
           docker build -t allure-generator ./allure
           
@@ -83,7 +90,7 @@ jobs:
         if: always()
         with:
           name: allure-html-report
-          path: allure-report/
+          path: example/allure-report/
           retention-days: 30
           
       - name: Upload raw test results
@@ -91,7 +98,7 @@ jobs:
         if: always()
         with:
           name: allure-results
-          path: allure-results/
+          path: example/allure-results/
           retention-days: 30
           
       - name: Upload test logs
@@ -100,12 +107,15 @@ jobs:
         with:
           name: docker-logs
           path: |
+            cd example
             docker compose logs
           retention-days: 7
           
       - name: Collect docker logs on failure
         if: failure()
         run: |
+          cd example
+
           echo "=== Docker logs for debugging ==="
           docker compose logs postgres
           docker compose logs echo-server
@@ -113,6 +123,8 @@ jobs:
       - name: Clean up
         if: always()
         run: |
+          cd example
+
           docker compose down -v
           docker system prune -f
           
@@ -129,6 +141,8 @@ jobs:
         
       - name: Build echo server image
         run: |
+          cd example
+
           docker build -t echo-server:latest ./tools/echo-server
           
       - name: Test echo server image
@@ -143,6 +157,8 @@ jobs:
           
       - name: Build test environment
         run: |
+          cd example
+
           docker compose build --no-cache
           
       - name: Clean up
