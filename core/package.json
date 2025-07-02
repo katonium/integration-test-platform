@@ -1,0 +1,37 @@
+{
+  "name": "integration-test-platform",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "ts-node src/test-runner.ts",
+    "build": "tsc",
+    "start": "node dist/test-runner.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/katonium/integration-test-platform.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/katonium/integration-test-platform/issues"
+  },
+  "homepage": "https://github.com/katonium/integration-test-platform#readme",
+  "dependencies": {
+    "@types/node": "^24.0.1",
+    "@types/pg": "^8.15.4",
+    "@types/uuid": "^10.0.0",
+    "allure-js-commons": "^3.2.2",
+    "pg": "^8.16.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3",
+    "uuid": "^11.1.0",
+    "yamljs": "^0.3.0"
+  },
+  "devDependencies": {
+    "@types/yamljs": "^0.2.34"
+  }
+}

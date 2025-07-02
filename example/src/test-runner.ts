@@ -1,11 +1,11 @@
-import { TestEngine } from './TestEngine';
-import { AllureReporter } from './reporters/AllureReporter';
-import { Config } from './Config';
-import { EchoAction } from './actions/EchoAction';
-import { NopAction } from './actions/NopAction';
-import { FailAction } from './actions/FailAction';
-import { RestApiCallAction } from './actions/RestApiAction';
-import { PostgreSQLAction } from './actions/PostgreSQLAction';
+import { TestEngine } from '../../core/src/TestEngine';
+import { AllureReporter } from '../../core/src/reporters/AllureReporter';
+import { Config } from '../../core/src/Config';
+import { EchoAction } from '../../core/src/actions/EchoAction';
+import { NopAction } from '../../core/src/actions/NopAction';
+import { FailAction } from '../../core/src/actions/FailAction';
+import { RestApiCallAction } from '../../core/src/actions/RestApiAction';
+import { PostgreSQLAction } from '../../core/src/actions/PostgreSQLAction';
 import * as path from 'path';
 import * as fs from 'fs';
 
