@@ -23,7 +23,7 @@ jobs:
           cache-dependency-path: 'example/package-lock.json'
 
       - name: Install dependencies for core
-        working-directory: ../core
+        working-directory: core
         run: npm ci
 
       - name: Install dependencies
