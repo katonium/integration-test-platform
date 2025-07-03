@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { BaseAction, StepDefinition, ActionResult } from './actions/BaseAction';
 import { BaseReporter } from './reporters/BaseReporter';
 import { Config } from './Config';
+import { ActionRegistry } from './ActionRegistry';
 
 export interface TestCase {
   kind: string;
@@ -19,16 +20,10 @@ export interface ExecutionContext {
 }
 
 export class TestEngine {
-  private actions: Map<string, BaseAction>;
   private reporter: BaseReporter;
 
   constructor(reporter: BaseReporter) {
     this.reporter = reporter;
-    this.actions = new Map();
-  }
-
-  public registerAction(kind: string, action: BaseAction): void {
-    this.actions.set(kind, action);
   }
 
   public async executeTestCase(yamlFilePath: string, context: Partial<ExecutionContext> = {}): Promise<boolean> {
@@ -62,7 +57,7 @@ export class TestEngine {
       
       await this.reporter.reportStepStart(processedStep.id, processedStep.name, processedStep.kind);
 
-      const action = this.actions.get(processedStep.kind);
+      const action = ActionRegistry.get(processedStep.kind);
       if (!action) {
         throw new Error(`Unknown action kind: ${processedStep.kind}`);
       }
@@ -154,7 +149,7 @@ export class TestEngine {
   }
 
   public async executeTestStep(step: StepDefinition): Promise<ActionResult> {
-    const action = this.actions.get(step.kind);
+    const action = ActionRegistry.get(step.kind);
     if (!action) {
       throw new Error(`Unknown action kind: ${step.kind}`);
     }

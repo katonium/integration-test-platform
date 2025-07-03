@@ -13,18 +13,28 @@ export class ActionRegistry {
     return ActionRegistry.instance;
   }
 
-  public static register(key: string, action: BaseAction, force: boolean = false): void {
+  public static register(kind: string, action: BaseAction, force: boolean = false): void {
     const instance = ActionRegistry.getInstance();
     
-    if (instance.actions.has(key) && !force) {
-      throw new Error(`Action with key '${key}' is already registered. Use force=true to override.`);
+    if (instance.actions.has(kind) && !force) {
+      throw new Error(`Action with kind '${kind}' is already registered. Use force=true to override.`);
     }
     
-    instance.actions.set(key, action);
+    instance.actions.set(kind, action);
   }
 
-  public static get(key: string): BaseAction | undefined {
+  public static get(kind: string): BaseAction | undefined {
     const instance = ActionRegistry.getInstance();
-    return instance.actions.get(key);
+    return instance.actions.get(kind);
+  }
+
+  public static has(kind: string): boolean {
+    const instance = ActionRegistry.getInstance();
+    return instance.actions.has(kind);
+  }
+
+  public static getAll(): Map<string, BaseAction> {
+    const instance = ActionRegistry.getInstance();
+    return new Map(instance.actions);
   }
 }
