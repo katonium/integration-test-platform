@@ -20,8 +20,11 @@ async function getAllStepsFromFiles(testFiles: string[]): Promise<StepDefinition
     try {
       const yamlContent = fs.readFileSync(testFile, 'utf8');
       const testCase = YAML.parse(yamlContent);
-      
       if (testCase.step && Array.isArray(testCase.step)) {
+        // ID自動付与
+        testCase.step.forEach((step: any, idx: number) => {
+          if (!step.id) step.id = `#${idx + 1}`;
+        });
         allSteps.push(...testCase.step);
       }
     } catch (error) {
@@ -90,6 +93,18 @@ async function runTests() {
 
     // Initialize engine with config
     const engine = new TestEngine(reporter);
+
+    // Helper: YAML→TestCase構築＋ID付与
+    function loadTestCaseWithStepIds(testFile: string): any {
+      const yamlContent = fs.readFileSync(testFile, 'utf8');
+      const testCase = YAML.parse(yamlContent);
+      if (testCase.step && Array.isArray(testCase.step)) {
+        testCase.step.forEach((step: any, idx: number) => {
+          if (!step.id) step.id = `#${idx + 1}`;
+        });
+      }
+      return testCase;
+    }
     
     console.log('📝 Configuration loaded:');
     console.log(`  Base URL: ${Config.get('baseUrl')}`);
@@ -115,26 +130,33 @@ async function runTests() {
     let totalFailed = 0;
     
     if (isRandomMode) {
-      // Random mode: collect all steps and execute 10 random steps
-      console.log('\n🎲 Random mode: Collecting all test steps...');
-      const allSteps = await getAllStepsFromFiles(allTestFiles);
-      
-      if (allSteps.length === 0) {
-        console.log('⚠️ No test steps found');
+      // ランダムモード: 最初のテストケースのステップから10個ランダム実行
+      const firstTestFile = allTestFiles[0];
+      if (!firstTestFile) {
+        console.log('⚠️ No test files found');
         return;
       }
-      
-      console.log(`\n📋 Found ${allSteps.length} total test step(s)`);
+      const testCase = loadTestCaseWithStepIds(firstTestFile);
+      if (!testCase.step || testCase.step.length === 0) {
+        console.log('⚠️ No test steps found in first test case');
+        return;
+      }
+      console.log(`\n📋 Found ${testCase.step.length} step(s) in first test case`);
       console.log('🎲 Executing 10 random steps...');
-      
+      // ExecutionContextの初期化
+      const executionContext = {
+        testCaseId: testCase.id || testCase.name || 'random',
+        testCaseName: testCase.name || 'random',
+        testCase,
+        testSuccess: true,
+        stepResults: new Map()
+      };
       for (let i = 0; i < 10; i++) {
-        const randomIndex = Math.floor(Math.random() * allSteps.length);
-        const randomStep = allSteps[randomIndex];
-        
+        const randomIndex = Math.floor(Math.random() * testCase.step.length);
+        const randomStep = testCase.step[randomIndex];
         console.log(`\n🔍 Executing random step ${i + 1}/10: ${randomStep.id} (${randomStep.kind})`);
-        
         try {
-          const result = await engine.executeTestStep(randomStep);
+          const result = await engine.executeTestStep(executionContext, randomStep.id);
           if (result.success) {
             console.log(`✅ Step ${randomStep.id}: PASS`);
             totalPassed++;
@@ -152,25 +174,32 @@ async function runTests() {
         }
       }
     } else {
-      // Normal mode: execute all test files
+      // 通常モード: 各テストファイルをロードし、全ステップを順次実行
       for (const testFile of allTestFiles) {
         const relativePath = path.relative('.', testFile);
         console.log(`\n🔍 Running ${relativePath}...`);
-        
-        try {
-          const result = await engine.executeTestCase(testFile);
-          if (result) {
-            console.log(`✅ ${relativePath}: PASS`);
-            totalPassed++;
-          } else {
-            console.log(`❌ ${relativePath}: FAIL`);
-            totalFailed++;
+        const testCase = loadTestCaseWithStepIds(testFile);
+        const executionContext = {
+          testCaseId: testCase.id || testCase.name || relativePath,
+          testCaseName: testCase.name || relativePath,
+          testCase,
+          testSuccess: true,
+          stepResults: new Map()
+        };
+        let allPassed = true;
+        for (const step of testCase.step) {
+          try {
+            const result = await engine.executeTestStep(executionContext, step.id);
+            if (!result.success) allPassed = false;
+          } catch (error) {
+            allPassed = false;
           }
-        } catch (error) {
-          console.error(`💥 ${relativePath}: ERROR - ${error instanceof Error ? error.message : 'Unknown error'}`);
-          if (error instanceof Error && error.stack) {
-            console.error('Stack trace:', error.stack);
-          }
+        }
+        if (allPassed) {
+          console.log(`✅ ${relativePath}: PASS`);
+          totalPassed++;
+        } else {
+          console.log(`❌ ${relativePath}: FAIL`);
           totalFailed++;
         }
       }
