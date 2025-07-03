@@ -151,6 +151,10 @@ async function runTests() {
         testSuccess: true,
         stepResults: new Map()
       };
+      
+      // テスト開始を報告
+      await reporter.reportTestStart(executionContext.testCaseId, executionContext.testCaseName);
+      
       for (let i = 0; i < 10; i++) {
         const randomIndex = Math.floor(Math.random() * testCase.step.length);
         const randomStep = testCase.step[randomIndex];
@@ -173,6 +177,9 @@ async function runTests() {
           totalFailed++;
         }
       }
+      
+      // テスト終了を報告
+      await reporter.reportTestEnd(executionContext.testCaseId, totalFailed === 0);
     } else {
       // 通常モード: 各テストファイルをロードし、全ステップを順次実行
       for (const testFile of allTestFiles) {
@@ -186,6 +193,10 @@ async function runTests() {
           testSuccess: true,
           stepResults: new Map()
         };
+        
+        // テスト開始を報告
+        await reporter.reportTestStart(executionContext.testCaseId, executionContext.testCaseName);
+        
         let allPassed = true;
         for (const step of testCase.step) {
           try {
@@ -195,6 +206,10 @@ async function runTests() {
             allPassed = false;
           }
         }
+        
+        // テスト終了を報告
+        await reporter.reportTestEnd(executionContext.testCaseId, allPassed);
+        
         if (allPassed) {
           console.log(`✅ ${relativePath}: PASS`);
           totalPassed++;
@@ -207,6 +222,7 @@ async function runTests() {
     
     // Generate reports
     console.log('\n📊 Generating Allure reports...');
+    await engine.generateReport();
     await engine.generateReport();
     console.log('✅ Reports generated in ./allure-results');
     
