@@ -1,0 +1,79 @@
+# https://taskfile.dev
+
+version: '3'
+
+vars:
+  GREETING: Hello, World!
+
+tasks:
+  default:
+    cmds:
+      - echo "{{.GREETING}}"
+
+  build:
+    desc: build the project
+    deps:
+      - build-lib
+    cmds:
+      - npm install
+      - npm run build
+
+  build-lib:
+    desc: build the library
+    dir: ../
+    cmds:
+      - npm run build
+
+
+  setup:
+    desc: setup workspace
+    cmds:
+      - go install github.com/google/go-containerregistry/cmd/crane@latest
+      - npm install -g @anthropic-ai/claude-code
+
+  clean:
+    desc: clean up workspace
+    cmds:
+      - rm -r allure-results
+
+  run:
+    desc: run test cases
+    cmds:
+      - npm run test
+
+  allure:dockerBuild:
+    desc: build allure report
+    cmds:
+      - docker build -t allure-serve ./allure
+
+  allure:generate:
+    desc: generate allure report
+    cmds:
+      - sudo rm -r allure-report || true
+      - docker run --rm -v "$(pwd)/allure-results:/app/allure-results" -v "$(pwd)/allure-report:/app/allure-report" allure-generator generate
+
+  allure:dockerRun:  # テスト結果をマウントしてサーバー起動
+    cmds:
+      - docker run --rm --name allure-serve -p 8083:8083 -v $(pwd)/allure-results:/app/allure-results allure-serve
+
+  allure:dockerStop:
+    desc: stop allure report server
+    cmds:
+      - docker stop allure-serve || true
+
+  stub:run:
+    desc: run stub server
+    cmds:
+      - docker composet up --build
+
+  stub:down:
+    desc: stop stub server
+    cmds:
+      - docker compose down
+
+  stub:runEchoServer:
+    desc: run stub server
+    dir: tools/echo-server
+    cmds:
+      - go run main.go
+

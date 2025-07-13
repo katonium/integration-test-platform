@@ -6,8 +6,7 @@
   "scripts": {
     "test": "ts-node src/test-runner.ts",
     "build": "tsc",
-    "build:runner": "cd example && tsc",
-    "start": "node example/dist/test-runner.js",
+    "start": "node dist/test-runner.js",
     "run:example": "node example/src/test-runner.js"
   },
   "repository": {
@@ -30,6 +29,10 @@
     "pg": "^8.16.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "yamljs": "^0.3.0"
+  },
+  "devDependencies": {
+    "@types/yamljs": "^0.2.34"
   }
 }

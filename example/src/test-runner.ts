@@ -1,13 +1,14 @@
-import { TestEngine } from './TestEngine';
-import { AllureReporter } from './reporters/AllureReporter';
-import { Config } from './Config';
-import { EchoAction } from './actions/EchoAction';
-import { NopAction } from './actions/NopAction';
-import { FailAction } from './actions/FailAction';
-import { RestApiCallAction } from './actions/RestApiAction';
-import { PostgreSQLAction } from './actions/PostgreSQLAction';
+import { TestEngine } from '../../dist/TestEngine';
+import { AllureReporter } from '../../dist/reporters/AllureReporter';
+import { Config } from '../../dist/Config';
+import { EchoAction } from '../../dist/actions/EchoAction';
+import { NopAction } from '../../dist/actions/NopAction';
+import { FailAction } from '../../dist/actions/FailAction';
+import { RestApiCallAction } from '../../dist/actions/RestApiAction';
+import { PostgreSQLAction } from '../../dist/actions/PostgreSQLAction';
 import * as path from 'path';
 import * as fs from 'fs';
+import YAML from 'yamljs';
 
 async function findTestFiles(targetPath: string): Promise<string[]> {
   const fullPath = path.resolve(targetPath);
@@ -61,7 +62,13 @@ async function runTests() {
     const reporter = new AllureReporter('./allure-results');
     
     // Load configuration
-    Config.load('./config.yaml');
+    const configPath = path.resolve('./config.yaml');
+    if (fs.existsSync(configPath)) {
+      const yamlContent = fs.readFileSync(configPath, 'utf8');
+      Config.load(YAML.parse(yamlContent) || {});
+    } else {
+      throw new Error(`Configuration file not found: ${configPath}`);
+    }
 
     // Initialize engine with config
     const engine = new TestEngine(reporter);

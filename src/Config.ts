@@ -1,5 +1,3 @@
-import * as YAML from 'yamljs';
-import * as fs from 'fs';
 
 export class Config {
   private static instance: Config | null = null;
@@ -14,11 +12,18 @@ export class Config {
     return Config.instance;
   }
 
-  public static load(configPath: string = './config.yaml'): void {
+  public static load(config: any): void {
     const instance = Config.getInstance();
-    if (fs.existsSync(configPath)) {
-      const yamlContent = fs.readFileSync(configPath, 'utf8');
-      instance.config = YAML.parse(yamlContent) || {};
+
+    // if config has already been loaded, abort
+    if (instance.config && Object.keys(instance.config).length > 0) {
+      throw new Error('Configuration has already been loaded. Use Config.reset() to clear the current configuration.');
+    }
+
+    if (typeof config === 'object' && config !== null) {
+      instance.config = config;
+    } else {
+      throw new Error('Invalid configuration object');
     }
   }
 
