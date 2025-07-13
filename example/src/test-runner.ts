@@ -1,4 +1,4 @@
-import { TestEngine } from '../../src/TestEngine';
+import { TestEngine, TestCase } from '../../src/TestEngine';
 import { AllureReporter } from '../../src/reporters/AllureReporter';
 import { Config } from '../../src/Config';
 import { EchoAction } from '../../src/actions/EchoAction';
@@ -6,6 +6,7 @@ import { NopAction } from '../../src/actions/NopAction';
 import { FailAction } from '../../src/actions/FailAction';
 import { RestApiCallAction } from '../../src/actions/RestApiAction';
 import { PostgreSQLAction } from '../../src/actions/PostgreSQLAction';
+import { GrpcAction } from '../../src/actions/GrpcAction';
 import * as path from 'path';
 import * as fs from 'fs';
 import YAML from 'yamljs';
@@ -79,6 +80,7 @@ async function runTests() {
     engine.registerAction('Fail', new FailAction());
     engine.registerAction('RestApiCall', new RestApiCallAction());
     engine.registerAction('PostgreSQL', new PostgreSQLAction());
+    engine.registerAction('Grpc', new GrpcAction());
     
     console.log('📝 Configuration loaded:');
     console.log(`  Base URL: ${Config.get('baseUrl')}`);
@@ -109,7 +111,9 @@ async function runTests() {
       console.log(`\n🔍 Running ${relativePath}...`);
       
       try {
-        const result = await engine.executeTestCase(testFile);
+        const yamlContent = fs.readFileSync(testFile, 'utf8');
+        const testCase: TestCase = YAML.parse(yamlContent);
+        const result = await engine.executeTestCase(testCase);
         if (result) {
           console.log(`✅ ${relativePath}: PASS`);
           totalPassed++;

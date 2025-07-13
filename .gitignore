@@ -56,3 +56,6 @@ tmp/
 # Allure results
 allure-results/
 allure-report/
+
+# Protobuf generated files
+*.pb.go

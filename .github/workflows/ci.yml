@@ -18,9 +18,20 @@ jobs:
           node-version: '18'
           cache: 'npm'
           
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22.5'
+
+      - name: Install task
+        run: go install github.com/go-task/task/v3/cmd/task@v3.39.0
+
+      - name: Set up workspace
+        run: task app:setup
+
       - name: Install dependencies
         run: npm ci
-        
+
       - name: Build TypeScript
         run: npm run build
         
@@ -29,16 +40,20 @@ jobs:
         
       - name: Build and start services
         run: |
+          task stub:build
           docker compose build
           docker compose up -d
-          
+
       - name: Wait for services to be ready
         run: |
           echo "Waiting for PostgreSQL to be ready..."
           timeout 60 bash -c 'until docker exec test-postgres pg_isready -U testuser -d testdb; do sleep 2; done'
           
-          echo "Waiting for echo server to be ready..."
+          echo "Waiting for HTTP echo server to be ready..."
           timeout 60 bash -c 'until curl -f http://localhost:8080/health 2>/dev/null || curl -f http://localhost:8080/ 2>/dev/null; do sleep 2; done'
+          
+          echo "Waiting for gRPC echo server to be ready..."
+          timeout 60 bash -c 'until nc -z localhost 50051; do sleep 2; done'
           
       - name: Verify services
         run: |
@@ -48,10 +63,14 @@ jobs:
           echo "=== Testing PostgreSQL connection ==="
           docker exec test-postgres psql -U testuser -d testdb -c "SELECT current_database(), current_user;"
           
-          echo "=== Testing echo server ==="
+          echo "=== Testing HTTP echo server ==="
           curl -X POST http://localhost:8080/test \
             -H "Content-Type: application/json" \
-            -d '{"message": "CI test"}' || echo "Echo server test failed"
+            -d '{"message": "CI test"}' || echo "HTTP echo server test failed"
+            
+          echo "=== Testing gRPC echo server ==="
+          # Check if gRPC server is listening
+          netstat -tlnp | grep :50051 || echo "gRPC server not listening on port 50051"
             
       - name: Run integration tests
         run: |
@@ -61,7 +80,7 @@ jobs:
       - name: Run all test manifests
         run: |
           echo "=== Running all test manifests ==="
-          npm test test-cases/success-sample.yaml test-cases/echo-sample.yaml test-cases/success-conditional-test.yaml
+          npm test test-cases/success-sample.yaml test-cases/echo-sample.yaml test-cases/success-conditional-test.yaml test-cases/grpc-echo-test.yaml
 
       - name: Generate Allure single HTML report
         if: always()

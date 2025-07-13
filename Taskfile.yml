@@ -15,6 +15,15 @@ tasks:
     cmds:
       - go install github.com/google/go-containerregistry/cmd/crane@latest
       - npm install -g @anthropic-ai/claude-code
+      - go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+      - go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+      - |
+        PROTOC_VERSION=$(curl -s "https://api.github.com/repos/protocolbuffers/protobuf/releases/latest" | grep -Po '"tag_name": "v\K[0-9.]+')
+        curl -Lo protoc.zip "https://github.com/protocolbuffers/protobuf/releases/latest/download/protoc-${PROTOC_VERSION}-linux-x86_64.zip"
+        sudo unzip protoc.zip -d /usr/local
+        sudo unzip -q protoc.zip bin/protoc 'include/*' -d /usr/local
+        sudo chmod a+x /usr/local/bin/protoc
+      - which protoc
 
   clean:
     desc: clean up workspace
@@ -37,7 +46,15 @@ tasks:
       - sudo rm -r allure-report || true
       - docker run --rm -v "$(pwd)/allure-results:/app/allure-results" -v "$(pwd)/allure-report:/app/allure-report" allure-generator generate
 
+  allure:serve:
+    cmds:
+      - task: allure:dockerRun
+
   allure:dockerRun:  # テスト結果をマウントしてサーバー起動
+    dir: example/
+    deps:
+      - task: allure:dockerStop
+      - task: allure:dockerBuild
     cmds:
       - docker run --rm --name allure-serve -p 8083:8083 -v $(pwd)/allure-results:/app/allure-results allure-serve
 
@@ -45,11 +62,23 @@ tasks:
     desc: stop allure report server
     cmds:
       - docker stop allure-serve || true
+      - docker rm allure-serve || true
+
+  stub:build:
+    desc: build stub server
+    dir: tools/echo-server
+    deps:
+      - task: proto:generate
+    cmds:
+      - CGO_ENABLED=0 GOOS=linux go build -o build/app .
 
   stub:run:
     desc: run stub server
+    deps:
+      - task: stub:build
     cmds:
-      - docker composet up --build
+      - docker compose build
+      - docker compose up
 
   stub:down:
     desc: stop stub server
@@ -61,4 +90,10 @@ tasks:
     dir: tools/echo-server
     cmds:
       - go run main.go
+
+  proto:generate:
+    desc: generate protobuf code for echo server
+    dir: tools/echo-server
+    cmds:
+      - protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative echo.proto
 

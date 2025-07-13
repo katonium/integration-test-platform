@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package echo;
+
+option go_package = "./;main";
+
+// EchoService provides echo functionality
+service EchoService {
+  // Echo returns the same message that was sent
+  rpc Echo(EchoRequest) returns (EchoResponse);
+  
+  // GetStatus returns server status
+  rpc GetStatus(StatusRequest) returns (StatusResponse);
+}
+
+// EchoRequest message
+message EchoRequest {
+  string message = 1;
+  map<string, string> metadata = 2;
+}
+
+// EchoResponse message
+message EchoResponse {
+  string message = 1;
+  map<string, string> metadata = 2;
+  int64 timestamp = 3;
+}
+
+// StatusRequest message
+message StatusRequest {
+  // Empty for now
+}
+
+// StatusResponse message
+message StatusResponse {
+  string status = 1;
+  string version = 2;
+  int64 uptime = 3;
+}

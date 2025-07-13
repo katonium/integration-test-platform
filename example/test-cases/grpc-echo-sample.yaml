@@ -1,0 +1,37 @@
+kind: TestCase/v0
+name: gRPC Echo Service Test
+step:
+  - name: Test Echo Method
+    id: grpc_echo_sample_1
+    kind: Grpc
+    params:
+      server: localhost:50051
+      service: echo.EchoService
+      method: Echo
+      request:
+        message: "Hello gRPC!"
+      metadata:
+        test_key: "test_value"
+        user_id: "12345"
+      timeout: 5000
+      insecure: true
+    responseValidation:
+      status: OK
+      response:
+        message: "Hello gRPC!"
+
+  - name: Test GetStatus Method
+    id: grpc_status_sample_1
+    kind: Grpc
+    params:
+      server: localhost:50051
+      service: echo.EchoService
+      method: GetStatus
+      request: {}
+      timeout: 5000
+      insecure: true
+    responseValidation:
+      status: OK
+      response:
+        status: "OK"
+        version: "1.0.0"

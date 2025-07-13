@@ -1,4 +1,3 @@
-import * as YAML from 'yamljs';
 import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { BaseAction, StepDefinition, ActionResult } from './actions/BaseAction';
@@ -31,9 +30,7 @@ export class TestEngine {
     this.actions.set(kind, action);
   }
 
-  public async executeTestCase(yamlFilePath: string, context: Partial<ExecutionContext> = {}): Promise<boolean> {
-    const yamlContent = fs.readFileSync(yamlFilePath, 'utf8');
-    const testCase: TestCase = YAML.parse(yamlContent);
+  public async executeTestCase(testCase: TestCase, context: Partial<ExecutionContext> = {}): Promise<boolean> {
 
     // Validate if conditions before starting the test
     this.validateIfConditions(testCase);
