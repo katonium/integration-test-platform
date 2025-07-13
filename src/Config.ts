@@ -31,7 +31,7 @@ export class Config {
     const instance = Config.getInstance();
     
     // Check environment variable first
-    const envKey = key.toUpperCase().replace('.', '_');
+    const envKey = key.toUpperCase().replaceAll('.', '_').replaceAll('-', '_');
     const envValue = process.env[envKey];
     if (envValue !== undefined) {
       return envValue;
