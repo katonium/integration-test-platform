@@ -6,6 +6,7 @@ import { NopAction } from '../../src/actions/NopAction';
 import { FailAction } from '../../src/actions/FailAction';
 import { RestApiCallAction } from '../../src/actions/RestApiAction';
 import { PostgreSQLAction } from '../../src/actions/PostgreSQLAction';
+import { PostgreSQLValidationAction } from '../../src/actions/PostgreSQLValidationAction';
 import { GrpcAction } from '../../src/actions/GrpcAction';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -80,6 +81,7 @@ async function runTests() {
     engine.registerAction('Fail', new FailAction());
     engine.registerAction('RestApiCall', new RestApiCallAction());
     engine.registerAction('PostgreSQL', new PostgreSQLAction());
+    engine.registerAction('PostgreSQLValidation', new PostgreSQLValidationAction());
     engine.registerAction('Grpc', new GrpcAction());
     
     console.log('📝 Configuration loaded:');
