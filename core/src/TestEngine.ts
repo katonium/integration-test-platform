@@ -171,53 +171,42 @@ export class TestEngine {
   }
 
   private validateDependencies(testCase: TestCase): void {
-    const stepIds = new Set(testCase.step.map(step => step.id));
+    // Validate unique step IDs
+    const stepIds = new Set<string>();
+    const duplicateIds = new Set<string>();
     
     for (const step of testCase.step) {
+      if (stepIds.has(step.id)) {
+        duplicateIds.add(step.id);
+      }
+      stepIds.add(step.id);
+    }
+    
+    if (duplicateIds.size > 0) {
+      throw new Error(`Duplicate step IDs found: ${Array.from(duplicateIds).join(', ')}`);
+    }
+    
+    // Validate dependencies using order-based rules
+    const stepIdToIndex = new Map<string, number>();
+    testCase.step.forEach((step, index) => {
+      stepIdToIndex.set(step.id, index);
+    });
+    
+    for (let i = 0; i < testCase.step.length; i++) {
+      const step = testCase.step[i];
       if (step.depends_on) {
         for (const dependency of step.depends_on) {
-          if (!stepIds.has(dependency)) {
+          // Check if dependency exists
+          if (!stepIdToIndex.has(dependency)) {
             throw new Error(`Step '${step.id}' depends on non-existent step '${dependency}'`);
           }
+          
+          // Check if dependency is defined above current step (order-based validation)
+          const dependencyIndex = stepIdToIndex.get(dependency)!;
+          if (dependencyIndex >= i) {
+            throw new Error(`Step '${step.id}' cannot depend on step '${dependency}' because dependencies must be defined above the current step`);
+          }
         }
-      }
-    }
-  }
-
-  private detectCircularDependencies(testCase: TestCase): void {
-    const visited = new Set<string>();
-    const recursionStack = new Set<string>();
-    
-    const dependencyMap = new Map<string, string[]>();
-    testCase.step.forEach(step => {
-      dependencyMap.set(step.id, step.depends_on || []);
-    });
-
-    const hasCycle = (stepId: string): boolean => {
-      if (recursionStack.has(stepId)) {
-        return true; // Found cycle
-      }
-      if (visited.has(stepId)) {
-        return false; // Already processed
-      }
-
-      visited.add(stepId);
-      recursionStack.add(stepId);
-
-      const dependencies = dependencyMap.get(stepId) || [];
-      for (const dependency of dependencies) {
-        if (hasCycle(dependency)) {
-          return true;
-        }
-      }
-
-      recursionStack.delete(stepId);
-      return false;
-    };
-
-    for (const step of testCase.step) {
-      if (!visited.has(step.id) && hasCycle(step.id)) {
-        throw new Error(`Circular dependency detected involving step '${step.id}'`);
       }
     }
   }
@@ -239,9 +228,8 @@ export class TestEngine {
   }
 
   public async executeTestCase(testCase: TestCase, executionContext: ExecutionContext): Promise<boolean> {
-    // Validate dependencies and detect circular dependencies
+    // Validate dependencies and unique IDs (order-based validation prevents circular dependencies)
     this.validateDependencies(testCase);
-    this.detectCircularDependencies(testCase);
     this.validateIfConditions(testCase);
 
     const stepStates = new Map<string, StepState>();
