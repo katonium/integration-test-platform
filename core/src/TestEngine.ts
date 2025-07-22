@@ -257,6 +257,38 @@ export class TestEngine {
     executionContext.stepResults = stepResults;
     
     let overallTestSuccess = true;
+    
+    // Check if any steps have dependencies
+    const hasStepsWithDependencies = testCase.step.some(step => step.depends_on && step.depends_on.length > 0);
+    
+    if (!hasStepsWithDependencies) {
+      // No dependencies - use sequential execution for full backward compatibility
+      for (const step of testCase.step) {
+        try {
+          const result = await this.executeTestStep(executionContext, step.id);
+          stepStates.set(step.id, { status: result.success ? StepStatus.FINISHED : StepStatus.FAILED, result });
+          if (!result.success) {
+            overallTestSuccess = false;
+            executionContext.testSuccess = false;
+          }
+        } catch (error) {
+          const errorResult: ActionResult = {
+            success: false,
+            output: {
+              error: error instanceof Error ? error.message : 'Unknown error',
+              stack: error instanceof Error ? error.stack : undefined
+            }
+          };
+          stepStates.set(step.id, { status: StepStatus.FAILED, result: errorResult });
+          stepResults.set(step.id, errorResult);
+          overallTestSuccess = false;
+          executionContext.testSuccess = false;
+        }
+      }
+      return overallTestSuccess;
+    }
+
+    // Has dependencies - use parallel execution with dependency management
     const executingSteps = new Set<string>();
     let allStepsCompleted = false;
 
@@ -294,6 +326,7 @@ export class TestEngine {
                 stepResults.set(step.id, failureResult);
                 await this.reporter.reportStepEnd(step.id, false, failureResult.output);
                 overallTestSuccess = false;
+                executionContext.testSuccess = false;  // Update execution context for conditional logic
                 return;
               }
             }
@@ -306,6 +339,7 @@ export class TestEngine {
           
           if (!result.success) {
             overallTestSuccess = false;
+            executionContext.testSuccess = false;  // Update execution context for conditional logic
           }
         } catch (error) {
           const errorResult: ActionResult = {
@@ -318,6 +352,7 @@ export class TestEngine {
           stepStates.set(step.id, { status: StepStatus.FAILED, result: errorResult });
           stepResults.set(step.id, errorResult);
           overallTestSuccess = false;
+          executionContext.testSuccess = false;  // Update execution context for conditional logic
         } finally {
           executingSteps.delete(step.id);
         }
