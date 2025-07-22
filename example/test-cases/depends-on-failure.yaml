@@ -1,0 +1,22 @@
+kind: TestCase/v0
+name: Test dependency failure propagation
+step:
+- name: Step that will fail
+  id: failing-step
+  kind: Fail
+  params:
+    message: "This step will fail"
+
+- name: Step depending on failure
+  id: dependent-step
+  depends_on:
+  - failing-step
+  kind: Echo
+  params:
+    message: "This should not execute due to dependency failure"
+
+- name: Independent step
+  id: independent-step
+  kind: Echo
+  params:
+    message: "This should execute independently"

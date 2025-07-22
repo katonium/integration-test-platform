@@ -15,6 +15,20 @@ export interface ExecutionContext {
   [key: string]: any;
 }
 
+export enum StepStatus {
+  PENDING = 'pending',
+  ENQUEUED = 'enqueued', 
+  RUNNING = 'running',
+  FINISHED = 'finished',
+  FAILED = 'failed',
+  SKIPPED = 'skipped'
+}
+
+export interface StepState {
+  status: StepStatus;
+  result?: ActionResult;
+}
+
 export class TestEngine {
   private reporter: BaseReporter;
 
@@ -154,5 +168,170 @@ export class TestEngine {
 
   public async generateReport(): Promise<void> {
     await this.reporter.generateReport();
+  }
+
+  private validateDependencies(testCase: TestCase): void {
+    const stepIds = new Set(testCase.step.map(step => step.id));
+    
+    for (const step of testCase.step) {
+      if (step.depends_on) {
+        for (const dependency of step.depends_on) {
+          if (!stepIds.has(dependency)) {
+            throw new Error(`Step '${step.id}' depends on non-existent step '${dependency}'`);
+          }
+        }
+      }
+    }
+  }
+
+  private detectCircularDependencies(testCase: TestCase): void {
+    const visited = new Set<string>();
+    const recursionStack = new Set<string>();
+    
+    const dependencyMap = new Map<string, string[]>();
+    testCase.step.forEach(step => {
+      dependencyMap.set(step.id, step.depends_on || []);
+    });
+
+    const hasCycle = (stepId: string): boolean => {
+      if (recursionStack.has(stepId)) {
+        return true; // Found cycle
+      }
+      if (visited.has(stepId)) {
+        return false; // Already processed
+      }
+
+      visited.add(stepId);
+      recursionStack.add(stepId);
+
+      const dependencies = dependencyMap.get(stepId) || [];
+      for (const dependency of dependencies) {
+        if (hasCycle(dependency)) {
+          return true;
+        }
+      }
+
+      recursionStack.delete(stepId);
+      return false;
+    };
+
+    for (const step of testCase.step) {
+      if (!visited.has(step.id) && hasCycle(step.id)) {
+        throw new Error(`Circular dependency detected involving step '${step.id}'`);
+      }
+    }
+  }
+
+  private canExecuteStep(step: StepDefinition, stepStates: Map<string, StepState>): boolean {
+    if (!step.depends_on || step.depends_on.length === 0) {
+      return true;
+    }
+
+    for (const dependency of step.depends_on) {
+      const depState = stepStates.get(dependency);
+      if (!depState || depState.status !== StepStatus.FINISHED) {
+        return false;
+      }
+      // Note: We allow execution even if dependency failed - the step will be marked as failed during execution
+    }
+
+    return true;
+  }
+
+  public async executeTestCase(testCase: TestCase, executionContext: ExecutionContext): Promise<boolean> {
+    // Validate dependencies and detect circular dependencies
+    this.validateDependencies(testCase);
+    this.detectCircularDependencies(testCase);
+    this.validateIfConditions(testCase);
+
+    const stepStates = new Map<string, StepState>();
+    const stepResults = new Map<string, ActionResult>();
+    
+    // Initialize all steps as pending
+    testCase.step.forEach(step => {
+      stepStates.set(step.id, { status: StepStatus.PENDING });
+    });
+
+    // Update execution context
+    executionContext.testCase = testCase;
+    executionContext.stepResults = stepResults;
+    
+    let overallTestSuccess = true;
+    const executingSteps = new Set<string>();
+    let allStepsCompleted = false;
+
+    while (!allStepsCompleted) {
+      const readySteps = testCase.step.filter(step => {
+        const state = stepStates.get(step.id)!;
+        return state.status === StepStatus.PENDING && 
+               this.canExecuteStep(step, stepStates) &&
+               !executingSteps.has(step.id);
+      });
+
+      // If no steps are ready and none are running, we're done
+      if (readySteps.length === 0 && executingSteps.size === 0) {
+        allStepsCompleted = true;
+        continue;
+      }
+
+      // Start execution of ready steps in parallel
+      const stepPromises = readySteps.map(async (step) => {
+        executingSteps.add(step.id);
+        stepStates.set(step.id, { status: StepStatus.RUNNING });
+
+        try {
+          // Check dependencies one more time for failed dependencies
+          if (step.depends_on) {
+            for (const dependency of step.depends_on) {
+              const depState = stepStates.get(dependency);
+              if (depState?.result && !depState.result.success) {
+                // Mark this step as failed due to dependency failure
+                const failureResult: ActionResult = {
+                  success: false,
+                  output: { error: `Dependency '${dependency}' failed` }
+                };
+                stepStates.set(step.id, { status: StepStatus.FAILED, result: failureResult });
+                stepResults.set(step.id, failureResult);
+                await this.reporter.reportStepEnd(step.id, false, failureResult.output);
+                overallTestSuccess = false;
+                return;
+              }
+            }
+          }
+
+          // Use the existing executeTestStep method which handles conditional logic
+          const result = await this.executeTestStep(executionContext, step.id);
+          const status = result.success ? StepStatus.FINISHED : StepStatus.FAILED;
+          stepStates.set(step.id, { status, result });
+          
+          if (!result.success) {
+            overallTestSuccess = false;
+          }
+        } catch (error) {
+          const errorResult: ActionResult = {
+            success: false,
+            output: {
+              error: error instanceof Error ? error.message : 'Unknown error',
+              stack: error instanceof Error ? error.stack : undefined
+            }
+          };
+          stepStates.set(step.id, { status: StepStatus.FAILED, result: errorResult });
+          stepResults.set(step.id, errorResult);
+          overallTestSuccess = false;
+        } finally {
+          executingSteps.delete(step.id);
+        }
+      });
+
+      // Wait for at least one step to complete before checking for more ready steps
+      if (stepPromises.length > 0) {
+        await Promise.race(stepPromises);
+      } else {
+        // If no steps started, wait a bit before checking again
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    }
+
+    return overallTestSuccess;
   }
 }

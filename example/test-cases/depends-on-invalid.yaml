@@ -1,0 +1,16 @@
+kind: TestCase/v0
+name: Test invalid dependency
+step:
+- name: Valid step
+  id: valid-step
+  kind: Echo
+  params:
+    message: "This step should work"
+
+- name: Invalid dependency step
+  id: invalid-dep-step
+  depends_on:
+  - invalid-step
+  kind: Echo
+  params:
+    message: "This step depends on non-existent step"
