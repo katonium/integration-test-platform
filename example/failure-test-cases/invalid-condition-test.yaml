@@ -1,0 +1,16 @@
+kind: TestCase/v0
+name: Invalid Condition Test
+step:
+- name: Valid step
+  id: valid-step
+  kind: Echo
+  if: always()
+  params:
+    message: "This should work"
+
+- name: Invalid condition step
+  id: invalid-step
+  kind: Echo
+  if: invalid_condition()
+  params:
+    message: "This should cause validation error"

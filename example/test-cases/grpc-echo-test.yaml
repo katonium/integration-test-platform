@@ -1,0 +1,39 @@
+kind: TestCase/v0
+name: "gRPC Echo Service Test"
+step:
+  - name: "Call Echo method"
+    id: "grpc_echo_test"
+    kind: Grpc
+    params:
+      server: "localhost:50051"
+      service: "echo.EchoService"
+      method: "Echo"
+      request:
+        message: "Hello from integration test!"
+      metadata:
+        test-id: "integration-test-001"
+        client-version: "1.0.0"
+      timeout: 5000
+      insecure: true
+    responseValidation:
+      status: "OK"
+      response:
+        message: "Hello from integration test!"
+
+  - name: "Call GetStatus method"
+    id: "grpc_status_test"
+    kind: Grpc
+    params:
+      server: "localhost:50051"
+      service: "echo.EchoService"
+      method: "GetStatus"
+      request: {}
+      metadata:
+        test-id: "integration-test-002"
+      timeout: 5000
+      insecure: true
+    responseValidation:
+      status: "OK"
+      response:
+        status: "OK"
+        version: "1.0.0"

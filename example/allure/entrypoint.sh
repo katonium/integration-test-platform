@@ -20,7 +20,7 @@ if [ "$1" = "generate" ]; then
     echo "HTML report generated in /app/allure-report"
     ls -la /app/allure-report/
 else
-    echo "Starting Allure server on port 8080..."
+    echo "Starting Allure server on port 8083..."
     # Generate and serve the report
-    allure serve /app/allure-results --host 0.0.0.0 --port 8080
+    allure serve /app/allure-results --host 0.0.0.0 --port 8083
 fi

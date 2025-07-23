@@ -1,4 +1,4 @@
-import { TestEngine } from '../../core/src/TestEngine';
+import { TestEngine, TestCase } from '../../core/src/TestEngine';
 import { ActionRegistry } from '../../core/src/ActionRegistry';
 import { AllureReporter } from '../../core/src/reporters/AllureReporter';
 import { Config } from '../../core/src/Config';
@@ -7,6 +7,8 @@ import { NopAction } from '../../core/src/actions/NopAction';
 import { FailAction } from '../../core/src/actions/FailAction';
 import { RestApiCallAction } from '../../core/src/actions/RestApiAction';
 import { PostgreSQLAction } from '../../core/src/actions/PostgreSQLAction';
+import { PostgreSQLValidationAction } from '../../core/src/actions/PostgreSQLValidationAction';
+import { GrpcAction } from '../../core/src/actions/GrpcAction';
 import { StepDefinition } from '../../core/src/actions/BaseAction';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -81,9 +83,7 @@ async function runTests() {
     
     // Parse command line arguments
     const args = process.argv.slice(2);
-    const isRandomMode = args.includes('--random');
-    const targets = args.filter(arg => arg !== '--random');
-    const finalTargets = targets.length > 0 ? targets : ['./test-cases'];
+    const targets = args.length > 0 ? args : ['./test-cases'];
     
     // Initialize reporter
     const reporter = new AllureReporter('./allure-results');
@@ -113,7 +113,7 @@ async function runTests() {
     
     // Collect all test files
     const allTestFiles: string[] = [];
-    for (const target of finalTargets) {
+    for (const target of targets) {
       const testFiles = await findTestFiles(target);
       allTestFiles.push(...testFiles);
     }
@@ -126,103 +126,36 @@ async function runTests() {
     console.log(`\n📋 Found ${allTestFiles.length} test file(s):`);
     allTestFiles.forEach(file => console.log(`  - ${path.relative('.', file)}`));
     
+    // Execute all test files
     let totalPassed = 0;
     let totalFailed = 0;
     
-    if (isRandomMode) {
-      // ランダムモード: 最初のテストケースのステップから10個ランダム実行
-      const firstTestFile = allTestFiles[0];
-      if (!firstTestFile) {
-        console.log('⚠️ No test files found');
-        return;
-      }
-      const testCase = loadTestCaseWithStepIds(firstTestFile);
-      if (!testCase.step || testCase.step.length === 0) {
-        console.log('⚠️ No test steps found in first test case');
-        return;
-      }
-      console.log(`\n📋 Found ${testCase.step.length} step(s) in first test case`);
-      console.log('🎲 Executing 10 random steps...');
-      // ExecutionContextの初期化
-      const executionContext = {
-        testCaseId: testCase.id || testCase.name || 'random',
-        testCaseName: testCase.name || 'random',
-        testCase,
-        testSuccess: true,
-        stepResults: new Map()
-      };
+    for (const testFile of allTestFiles) {
+      const relativePath = path.relative('.', testFile);
+      console.log(`\n🔍 Running ${relativePath}...`);
       
-      // テスト開始を報告
-      await reporter.reportTestStart(executionContext.testCaseId, executionContext.testCaseName);
-      
-      for (let i = 0; i < 10; i++) {
-        const randomIndex = Math.floor(Math.random() * testCase.step.length);
-        const randomStep = testCase.step[randomIndex];
-        console.log(`\n🔍 Executing random step ${i + 1}/10: ${randomStep.id} (${randomStep.kind})`);
-        try {
-          const result = await engine.executeTestStep(executionContext, randomStep.id);
-          if (result.success) {
-            console.log(`✅ Step ${randomStep.id}: PASS`);
-            totalPassed++;
-          } else {
-            console.log(`❌ Step ${randomStep.id}: FAIL`);
-            console.log(`    Error: ${JSON.stringify(result.output, null, 2)}`);
-            totalFailed++;
-          }
-        } catch (error) {
-          console.error(`💥 Step ${randomStep.id}: ERROR - ${error instanceof Error ? error.message : 'Unknown error'}`);
-          if (error instanceof Error && error.stack) {
-            console.error('Stack trace:', error.stack);
-          }
-          totalFailed++;
-        }
-      }
-      
-      // テスト終了を報告
-      await reporter.reportTestEnd(executionContext.testCaseId, totalFailed === 0);
-    } else {
-      // 通常モード: 各テストファイルをロードし、全ステップを順次実行
-      for (const testFile of allTestFiles) {
-        const relativePath = path.relative('.', testFile);
-        console.log(`\n🔍 Running ${relativePath}...`);
-        const testCase = loadTestCaseWithStepIds(testFile);
-        const executionContext = {
-          testCaseId: testCase.id || testCase.name || relativePath,
-          testCaseName: testCase.name || relativePath,
-          testCase,
-          testSuccess: true,
-          stepResults: new Map()
-        };
-        
-        // テスト開始を報告
-        await reporter.reportTestStart(executionContext.testCaseId, executionContext.testCaseName);
-        
-        let allPassed = true;
-        for (const step of testCase.step) {
-          try {
-            const result = await engine.executeTestStep(executionContext, step.id);
-            if (!result.success) allPassed = false;
-          } catch (error) {
-            allPassed = false;
-          }
-        }
-        
-        // テスト終了を報告
-        await reporter.reportTestEnd(executionContext.testCaseId, allPassed);
-        
-        if (allPassed) {
+      try {
+        const yamlContent = fs.readFileSync(testFile, 'utf8');
+        const testCase: TestCase = YAML.parse(yamlContent);
+        const result = await engine.executeTestCase(testCase);
+        if (result) {
           console.log(`✅ ${relativePath}: PASS`);
           totalPassed++;
         } else {
           console.log(`❌ ${relativePath}: FAIL`);
           totalFailed++;
         }
+      } catch (error) {
+        console.error(`💥 ${relativePath}: ERROR - ${error instanceof Error ? error.message : 'Unknown error'}`);
+        if (error instanceof Error && error.stack) {
+          console.error('Stack trace:', error.stack);
+        }
+        totalFailed++;
       }
     }
     
     // Generate reports
     console.log('\n📊 Generating Allure reports...');
-    await engine.generateReport();
     await engine.generateReport();
     console.log('✅ Reports generated in ./allure-results');
     

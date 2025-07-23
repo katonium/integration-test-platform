@@ -1,4 +1,5 @@
-import { StepDefinition, ActionResult } from './actions/BaseAction';
+import { v4 as uuidv4 } from 'uuid';
+import { BaseAction, StepDefinition, ActionResult } from './actions/BaseAction';
 import { BaseReporter } from './reporters/BaseReporter';
 import { ActionRegistry } from './ActionRegistry';
 
@@ -20,6 +21,77 @@ export class TestEngine {
 
   constructor(reporter: BaseReporter) {
     this.reporter = reporter;
+  }
+
+  public async executeTestCase(testCase: TestCase, context: Partial<ExecutionContext> = {}): Promise<boolean> {
+
+    // Validate if conditions before starting the test
+    this.validateIfConditions(testCase);
+
+    const executionContext: ExecutionContext = {
+      testCaseId: context.testCaseId || uuidv4(),
+      testCaseName: testCase.name,
+      ...context
+    };
+
+    const stepResults: Map<string, ActionResult> = new Map();
+    let testSuccess = true;
+
+    await this.reporter.reportTestStart(executionContext.testCaseId, executionContext.testCaseName);
+
+    for (const step of testCase.step) {
+      const processedStep = this.processStepVariables(step, executionContext, stepResults);
+      
+      // Evaluate if condition
+      if (!this.shouldExecuteStep(processedStep, testSuccess)) {
+        const reason = processedStep.if ? `Condition: ${processedStep.if}` : 'Condition: success() (default)';
+        console.log(`  Step ${processedStep.id} (${processedStep.kind}): SKIPPED (${reason})`);
+        await this.reporter.reportStepSkipped(processedStep.id, processedStep.name, processedStep.kind, reason);
+        continue;
+      }
+      
+      await this.reporter.reportStepStart(processedStep.id, processedStep.name, processedStep.kind);
+
+      const action = ActionRegistry.get(processedStep.kind);
+      if (!action) {
+        throw new Error(`Unknown action kind: ${processedStep.kind}`);
+      }
+
+      try {
+        const result = await action.execute(processedStep);
+        stepResults.set(processedStep.id, result);
+        
+        // Debug logging
+        console.log(`  Step ${processedStep.id} (${processedStep.kind}): ${result.success ? 'SUCCESS' : 'FAILED'}`);
+        if (!result.success) {
+          console.log(`    Error: ${JSON.stringify(result.output, null, 2)}`);
+        } else {
+          console.log(`    Result structure: ${JSON.stringify(result.output, null, 2)}`);
+        }
+        
+        await this.reporter.reportStepEnd(processedStep.id, result.success, result.output);
+
+        if (!result.success) {
+          testSuccess = false;
+          // Don't break here anymore - let remaining steps with if conditions execute
+        }
+      } catch (error) {
+        const errorResult: ActionResult = {
+          success: false,
+          output: {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined
+          }
+        };
+        stepResults.set(processedStep.id, errorResult);
+        await this.reporter.reportStepEnd(processedStep.id, false, errorResult.output);
+        testSuccess = false;
+        // Don't break here anymore - let remaining steps with if conditions execute
+      }
+    }
+
+    await this.reporter.reportTestEnd(executionContext.testCaseId, testSuccess);
+    return testSuccess;
   }
 
   private processStepVariables(

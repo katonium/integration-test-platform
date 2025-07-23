@@ -1,0 +1,42 @@
+kind: TestCase/v0
+testCase:
+  name: "PostgreSQL Validation Test"
+  description: "Test PostgreSQL validation with automatic query building from conditions"
+
+step:
+  - id: "setup_additional_test_data"
+    name: "Add additional test data for validation"
+    kind: "PostgreSQL"
+    params:
+      query: |
+        INSERT INTO test_schema.users (name, email, age) VALUES 
+        ('Tom Wilson', 'tom@example.com', NULL),
+        ('Charlie Brown', 'charlie@example.com', 54),
+        ('Diana Prince', 'diana@example.com', 28)
+        ON CONFLICT (email) DO NOTHING;
+
+  - id: "validate_users_data"
+    name: "Validate users table data with automatic query building"
+    kind: "PostgreSQLValidation"
+    params:
+      table: "users"
+      responseValidation:
+        - name: "John Doe"
+          age: 30
+        - name: "Jane Smith"
+          age: 25
+        - name: "Tom Wilson"
+          age: "[null]"
+        - name: "[!null]"
+          age: 54
+        - email: "diana@example.com"
+          age: 28
+
+  - id: "cleanup_additional_test_data"
+    if: always() # always clean up
+    name: "Clean up additional test data"
+    kind: "PostgreSQL"
+    params:
+      query: |
+        DELETE FROM test_schema.users 
+        WHERE email IN ('tom@example.com', 'charlie@example.com', 'diana@example.com');

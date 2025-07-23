@@ -20,3 +20,4 @@ services:
     container_name: echo-server
     ports:
       - "8080:8080"
+      - "50051:50051"

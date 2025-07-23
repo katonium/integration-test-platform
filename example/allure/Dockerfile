@@ -22,7 +22,7 @@ RUN mkdir -p /app/allure-results
 WORKDIR /app
 
 # Expose port for Allure serve
-EXPOSE 8080
+EXPOSE 8083
 
 # Copy entrypoint script
 COPY entrypoint.sh /entrypoint.sh
