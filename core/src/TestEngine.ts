@@ -1,8 +1,7 @@
-import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { BaseAction, StepDefinition, ActionResult } from './actions/BaseAction';
 import { BaseReporter } from './reporters/BaseReporter';
-import { Config } from './Config';
+import { ActionRegistry } from './ActionRegistry';
 
 export interface TestCase {
   kind: string;
@@ -18,16 +17,10 @@ export interface ExecutionContext {
 }
 
 export class TestEngine {
-  private actions: Map<string, BaseAction>;
   private reporter: BaseReporter;
 
   constructor(reporter: BaseReporter) {
     this.reporter = reporter;
-    this.actions = new Map();
-  }
-
-  public registerAction(kind: string, action: BaseAction): void {
-    this.actions.set(kind, action);
   }
 
   public async executeTestCase(testCase: TestCase, context: Partial<ExecutionContext> = {}): Promise<boolean> {
@@ -59,7 +52,7 @@ export class TestEngine {
       
       await this.reporter.reportStepStart(processedStep.id, processedStep.name, processedStep.kind);
 
-      const action = this.actions.get(processedStep.kind);
+      const action = ActionRegistry.get(processedStep.kind);
       if (!action) {
         throw new Error(`Unknown action kind: ${processedStep.kind}`);
       }
@@ -150,23 +143,50 @@ export class TestEngine {
     return replaceVariables(processedStep);
   }
 
-  public async executeTestStep(step: StepDefinition): Promise<ActionResult> {
-    const action = this.actions.get(step.kind);
-    if (!action) {
-      throw new Error(`Unknown action kind: ${step.kind}`);
+  public async executeTestStep(executionContext: ExecutionContext, stepId: string): Promise<ActionResult> {
+    const { testCase, stepResults, testSuccess } = executionContext;
+    const step = testCase.step.find((s: StepDefinition) => s.id === stepId);
+    if (!step) throw new Error(`Step with id ${stepId} not found`);
+    const processedStep = this.processStepVariables(step, executionContext, stepResults);
+
+    // Evaluate if condition
+    if (!this.shouldExecuteStep(processedStep, executionContext.testSuccess)) {
+      const reason = processedStep.if ? `Condition: ${processedStep.if}` : 'Condition: success() (default)';
+      console.log(`  Step ${processedStep.id} (${processedStep.kind}): SKIPPED (${reason})`);
+      await this.reporter.reportStepSkipped(processedStep.id, processedStep.name, processedStep.kind, reason);
+      return { success: true, output: 'SKIPPED' };
     }
 
+    await this.reporter.reportStepStart(processedStep.id, processedStep.name, processedStep.kind);
+    const action = ActionRegistry.get(processedStep.kind);
+    if (!action) {
+      throw new Error(`Unknown action kind: ${processedStep.kind}`);
+    }
     try {
-      const result = await action.execute(step);
+      const result = await action.execute(processedStep);
+      stepResults.set(processedStep.id, result);
+      // Debug logging
+      console.log(`  Step ${processedStep.id} (${processedStep.kind}): ${result.success ? 'SUCCESS' : 'FAILED'}`);
+      if (!result.success) {
+        console.log(`    Error: ${JSON.stringify(result.output, null, 2)}`);
+      } else {
+        console.log(`    Result structure: ${JSON.stringify(result.output, null, 2)}`);
+      }
+      await this.reporter.reportStepEnd(processedStep.id, result.success, result.output);
+      if (!result.success) executionContext.testSuccess = false;
       return result;
     } catch (error) {
-      return {
+      const errorResult: ActionResult = {
         success: false,
         output: {
           error: error instanceof Error ? error.message : 'Unknown error',
           stack: error instanceof Error ? error.stack : undefined
         }
       };
+      stepResults.set(processedStep.id, errorResult);
+      await this.reporter.reportStepEnd(processedStep.id, false, errorResult.output);
+      executionContext.testSuccess = false;
+      return errorResult;
     }
   }
 

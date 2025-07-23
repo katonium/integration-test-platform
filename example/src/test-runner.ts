@@ -1,4 +1,5 @@
 import { TestEngine, TestCase } from '../../core/src/TestEngine';
+import { ActionRegistry } from '../../core/src/ActionRegistry';
 import { AllureReporter } from '../../core/src/reporters/AllureReporter';
 import { Config } from '../../core/src/Config';
 import { EchoAction } from '../../core/src/actions/EchoAction';
@@ -8,9 +9,33 @@ import { RestApiCallAction } from '../../core/src/actions/RestApiAction';
 import { PostgreSQLAction } from '../../core/src/actions/PostgreSQLAction';
 import { PostgreSQLValidationAction } from '../../core/src/actions/PostgreSQLValidationAction';
 import { GrpcAction } from '../../core/src/actions/GrpcAction';
+import { StepDefinition } from '../../core/src/actions/BaseAction';
 import * as path from 'path';
 import * as fs from 'fs';
-import YAML from 'yamljs';
+import * as YAML from 'yamljs';
+
+// Helper function to get all steps from test files
+async function getAllStepsFromFiles(testFiles: string[]): Promise<StepDefinition[]> {
+  const allSteps: StepDefinition[] = [];
+  
+  for (const testFile of testFiles) {
+    try {
+      const yamlContent = fs.readFileSync(testFile, 'utf8');
+      const testCase = YAML.parse(yamlContent);
+      if (testCase.step && Array.isArray(testCase.step)) {
+        // ID自動付与
+        testCase.step.forEach((step: any, idx: number) => {
+          if (!step.id) step.id = `#${idx + 1}`;
+        });
+        allSteps.push(...testCase.step);
+      }
+    } catch (error) {
+      console.error(`Error reading test file ${testFile}:`, error);
+    }
+  }
+  
+  return allSteps;
+}
 
 async function findTestFiles(targetPath: string): Promise<string[]> {
   const fullPath = path.resolve(targetPath);
@@ -64,25 +89,22 @@ async function runTests() {
     const reporter = new AllureReporter('./allure-results');
     
     // Load configuration
-    const configPath = path.resolve('./config.yaml');
-    if (fs.existsSync(configPath)) {
-      const yamlContent = fs.readFileSync(configPath, 'utf8');
-      Config.load(YAML.parse(yamlContent) || {});
-    } else {
-      throw new Error(`Configuration file not found: ${configPath}`);
-    }
+    Config.load('./config.yaml');
 
     // Initialize engine with config
     const engine = new TestEngine(reporter);
-    
-    // Register all actions
-    engine.registerAction('Echo', new EchoAction());
-    engine.registerAction('Nop', new NopAction());
-    engine.registerAction('Fail', new FailAction());
-    engine.registerAction('RestApiCall', new RestApiCallAction());
-    engine.registerAction('PostgreSQL', new PostgreSQLAction());
-    engine.registerAction('PostgreSQLValidation', new PostgreSQLValidationAction());
-    engine.registerAction('Grpc', new GrpcAction());
+
+    // Helper: YAML→TestCase構築＋ID付与
+    function loadTestCaseWithStepIds(testFile: string): any {
+      const yamlContent = fs.readFileSync(testFile, 'utf8');
+      const testCase = YAML.parse(yamlContent);
+      if (testCase.step && Array.isArray(testCase.step)) {
+        testCase.step.forEach((step: any, idx: number) => {
+          if (!step.id) step.id = `#${idx + 1}`;
+        });
+      }
+      return testCase;
+    }
     
     console.log('📝 Configuration loaded:');
     console.log(`  Base URL: ${Config.get('baseUrl')}`);
@@ -156,4 +178,24 @@ async function runTests() {
   }
 }
 
-runTests();
+async function main() {
+  try {
+    await runTests();
+  } catch (error) {
+    console.error('❌ Error in main function:', error);
+    process.exit(1);
+  }
+}
+
+// Register all actions
+ActionRegistry.register('Echo', new EchoAction());
+ActionRegistry.register('Nop', new NopAction());
+ActionRegistry.register('Fail', new FailAction());
+ActionRegistry.register('RestApiCall', new RestApiCallAction());
+ActionRegistry.register('PostgreSQL', new PostgreSQLAction());
+
+
+main().catch(error => {
+  console.error('❌ Uncaught error:', error);
+  process.exit(1);
+});

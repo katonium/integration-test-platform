@@ -65,7 +65,6 @@ tasks:
       - task: allure:dockerRun
 
   allure:dockerRun:  # テスト結果をマウントしてサーバー起動
-    dir: example/
     deps:
       - task: allure:dockerStop
       - task: allure:dockerBuild
@@ -76,7 +75,6 @@ tasks:
     desc: stop allure report server
     cmds:
       - docker stop allure-serve || true
-      - docker rm allure-serve || true
 
   stub:build:
     desc: build stub server
@@ -110,4 +108,3 @@ tasks:
     dir: tools/echo-server
     cmds:
       - protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative echo.proto
-

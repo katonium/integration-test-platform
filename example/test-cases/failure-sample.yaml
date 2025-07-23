@@ -1,0 +1,39 @@
+kind: TestCase/v0
+name: Sample Test Case with Failures
+step:
+  - name: Successful initialization
+    id: init_success
+    kind: Echo
+    params:
+      message: "This step should succeed"
+      data:
+        initialized: true
+        timestamp: "{testCaseId}"
+
+  - name: Another successful step
+    id: success_step
+    kind: Nop
+
+  - name: Echo success state
+    id: echo_success
+    kind: Echo
+    params:
+      message: "Previous steps were successful"
+      successData:
+        init: "{init_success.success}"
+        nop: "{success_step.success}"
+
+  - name: Intentional failure step
+    id: failure_step
+    kind: Fail
+    params:
+      message: "This is an intentional failure to test error handling"
+
+  - name: This step should not execute
+    id: after_failure
+    kind: Echo
+    params:
+      message: "This should not run due to previous failure"
+      
+  - name: Final cleanup attempt
+    kind: Nop
