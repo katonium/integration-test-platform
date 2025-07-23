@@ -244,39 +244,58 @@ export class TestEngine {
     executionContext.testCase = testCase;
     executionContext.stepResults = stepResults;
     
-    let overallTestSuccess = true;
-    
     // Check if any steps have dependencies
     const hasStepsWithDependencies = testCase.step.some(step => step.depends_on && step.depends_on.length > 0);
     
     if (!hasStepsWithDependencies) {
       // No dependencies - use sequential execution for full backward compatibility
-      for (const step of testCase.step) {
-        try {
-          const result = await this.executeTestStep(executionContext, step.id);
-          stepStates.set(step.id, { status: result.success ? StepStatus.FINISHED : StepStatus.FAILED, result });
-          if (!result.success) {
-            overallTestSuccess = false;
-            executionContext.testSuccess = false;
-          }
-        } catch (error) {
-          const errorResult: ActionResult = {
-            success: false,
-            output: {
-              error: error instanceof Error ? error.message : 'Unknown error',
-              stack: error instanceof Error ? error.stack : undefined
-            }
-          };
-          stepStates.set(step.id, { status: StepStatus.FAILED, result: errorResult });
-          stepResults.set(step.id, errorResult);
-          overallTestSuccess = false;
-          executionContext.testSuccess = false;
-        }
-      }
-      return overallTestSuccess;
+      return await this.executeStepsSequentially(testCase, executionContext, stepStates, stepResults);
     }
 
     // Has dependencies - use parallel execution with dependency management
+    return await this.executeStepsWithDependencies(testCase, executionContext, stepStates, stepResults);
+  }
+
+  private async executeStepsSequentially(
+    testCase: TestCase, 
+    executionContext: ExecutionContext, 
+    stepStates: Map<string, StepState>, 
+    stepResults: Map<string, ActionResult>
+  ): Promise<boolean> {
+    let overallTestSuccess = true;
+    
+    for (const step of testCase.step) {
+      try {
+        const result = await this.executeTestStep(executionContext, step.id);
+        stepStates.set(step.id, { status: result.success ? StepStatus.FINISHED : StepStatus.FAILED, result });
+        if (!result.success) {
+          overallTestSuccess = false;
+          executionContext.testSuccess = false;
+        }
+      } catch (error) {
+        const errorResult: ActionResult = {
+          success: false,
+          output: {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined
+          }
+        };
+        stepStates.set(step.id, { status: StepStatus.FAILED, result: errorResult });
+        stepResults.set(step.id, errorResult);
+        overallTestSuccess = false;
+        executionContext.testSuccess = false;
+      }
+    }
+    return overallTestSuccess;
+  }
+
+  private async executeStepsWithDependencies(
+    testCase: TestCase, 
+    executionContext: ExecutionContext, 
+    stepStates: Map<string, StepState>, 
+    stepResults: Map<string, ActionResult>
+  ): Promise<boolean> {
+    let overallTestSuccess = true;
     const executingSteps = new Set<string>();
     let allStepsCompleted = false;
 
