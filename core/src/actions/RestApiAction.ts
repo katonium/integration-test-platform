@@ -77,10 +77,16 @@ export class RestApiCallAction extends BaseAction {
         responseBody = await response.text();
       }
 
+      // Convert headers to plain object
+      const headerObj: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        headerObj[key] = value;
+      });
+
       const result = {
         status: response.status,
         statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
+        headers: headerObj,
         body: responseBody
       };
 

@@ -15,6 +15,20 @@ export interface ExecutionContext {
   [key: string]: any;
 }
 
+export enum StepStatus {
+  PENDING = 'pending',
+  ENQUEUED = 'enqueued', 
+  RUNNING = 'running',
+  FINISHED = 'finished',
+  FAILED = 'failed',
+  SKIPPED = 'skipped'
+}
+
+export interface StepState {
+  status: StepStatus;
+  result?: ActionResult;
+}
+
 export class TestEngine {
   private reporter: BaseReporter;
 
@@ -154,5 +168,212 @@ export class TestEngine {
 
   public async generateReport(): Promise<void> {
     await this.reporter.generateReport();
+  }
+
+  private validateDependencies(testCase: TestCase): void {
+    // Validate unique step IDs
+    const stepIds = new Set<string>();
+    const duplicateIds = new Set<string>();
+    
+    for (const step of testCase.step) {
+      if (stepIds.has(step.id)) {
+        duplicateIds.add(step.id);
+      }
+      stepIds.add(step.id);
+    }
+    
+    if (duplicateIds.size > 0) {
+      throw new Error(`Duplicate step IDs found: ${Array.from(duplicateIds).join(', ')}`);
+    }
+    
+    // Validate dependencies using order-based rules
+    const stepIdToIndex = new Map<string, number>();
+    testCase.step.forEach((step, index) => {
+      stepIdToIndex.set(step.id, index);
+    });
+    
+    for (let i = 0; i < testCase.step.length; i++) {
+      const step = testCase.step[i];
+      if (step.depends_on) {
+        for (const dependency of step.depends_on) {
+          // Check if dependency exists
+          if (!stepIdToIndex.has(dependency)) {
+            throw new Error(`Step '${step.id}' depends on non-existent step '${dependency}'`);
+          }
+          
+          // Check if dependency is defined above current step (order-based validation)
+          const dependencyIndex = stepIdToIndex.get(dependency)!;
+          if (dependencyIndex >= i) {
+            throw new Error(`Step '${step.id}' cannot depend on step '${dependency}' because dependencies must be defined above the current step`);
+          }
+        }
+      }
+    }
+  }
+
+  private canExecuteStep(step: StepDefinition, stepStates: Map<string, StepState>): boolean {
+    if (!step.depends_on || step.depends_on.length === 0) {
+      return true;
+    }
+
+    for (const dependency of step.depends_on) {
+      const depState = stepStates.get(dependency);
+      if (!depState || depState.status !== StepStatus.FINISHED) {
+        return false;
+      }
+      // Note: We allow execution even if dependency failed - the step will be marked as failed during execution
+    }
+
+    return true;
+  }
+
+  public async executeTestCase(testCase: TestCase, executionContext: ExecutionContext): Promise<boolean> {
+    // Validate dependencies and unique IDs (order-based validation prevents circular dependencies)
+    this.validateDependencies(testCase);
+    this.validateIfConditions(testCase);
+
+    const stepStates = new Map<string, StepState>();
+    const stepResults = new Map<string, ActionResult>();
+    
+    // Initialize all steps as pending
+    testCase.step.forEach(step => {
+      stepStates.set(step.id, { status: StepStatus.PENDING });
+    });
+
+    // Update execution context
+    executionContext.testCase = testCase;
+    executionContext.stepResults = stepResults;
+    
+    // Check if any steps have dependencies
+    const hasStepsWithDependencies = testCase.step.some(step => step.depends_on && step.depends_on.length > 0);
+    
+    if (!hasStepsWithDependencies) {
+      // No dependencies - use sequential execution for full backward compatibility
+      return await this.executeStepsSequentially(testCase, executionContext, stepStates, stepResults);
+    }
+
+    // Has dependencies - use parallel execution with dependency management
+    return await this.executeStepsWithDependencies(testCase, executionContext, stepStates, stepResults);
+  }
+
+  private async executeStepsSequentially(
+    testCase: TestCase, 
+    executionContext: ExecutionContext, 
+    stepStates: Map<string, StepState>, 
+    stepResults: Map<string, ActionResult>
+  ): Promise<boolean> {
+    let overallTestSuccess = true;
+    
+    for (const step of testCase.step) {
+      try {
+        const result = await this.executeTestStep(executionContext, step.id);
+        stepStates.set(step.id, { status: result.success ? StepStatus.FINISHED : StepStatus.FAILED, result });
+        if (!result.success) {
+          overallTestSuccess = false;
+          executionContext.testSuccess = false;
+        }
+      } catch (error) {
+        const errorResult: ActionResult = {
+          success: false,
+          output: {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined
+          }
+        };
+        stepStates.set(step.id, { status: StepStatus.FAILED, result: errorResult });
+        stepResults.set(step.id, errorResult);
+        overallTestSuccess = false;
+        executionContext.testSuccess = false;
+      }
+    }
+    return overallTestSuccess;
+  }
+
+  private async executeStepsWithDependencies(
+    testCase: TestCase, 
+    executionContext: ExecutionContext, 
+    stepStates: Map<string, StepState>, 
+    stepResults: Map<string, ActionResult>
+  ): Promise<boolean> {
+    let overallTestSuccess = true;
+    const executingSteps = new Set<string>();
+    let allStepsCompleted = false;
+
+    while (!allStepsCompleted) {
+      const readySteps = testCase.step.filter(step => {
+        const state = stepStates.get(step.id)!;
+        return state.status === StepStatus.PENDING && 
+               this.canExecuteStep(step, stepStates) &&
+               !executingSteps.has(step.id);
+      });
+
+      // If no steps are ready and none are running, we're done
+      if (readySteps.length === 0 && executingSteps.size === 0) {
+        allStepsCompleted = true;
+        continue;
+      }
+
+      // Start execution of ready steps in parallel
+      const stepPromises = readySteps.map(async (step) => {
+        executingSteps.add(step.id);
+        stepStates.set(step.id, { status: StepStatus.RUNNING });
+
+        try {
+          // Check dependencies one more time for failed dependencies
+          if (step.depends_on) {
+            for (const dependency of step.depends_on) {
+              const depState = stepStates.get(dependency);
+              if (depState?.result && !depState.result.success) {
+                // Mark this step as failed due to dependency failure
+                const failureResult: ActionResult = {
+                  success: false,
+                  output: { error: `Dependency '${dependency}' failed` }
+                };
+                stepStates.set(step.id, { status: StepStatus.FAILED, result: failureResult });
+                stepResults.set(step.id, failureResult);
+                await this.reporter.reportStepEnd(step.id, false, failureResult.output);
+                overallTestSuccess = false;
+                executionContext.testSuccess = false;  // Update execution context for conditional logic
+                return;
+              }
+            }
+          }
+
+          // Use the existing executeTestStep method which handles conditional logic
+          const result = await this.executeTestStep(executionContext, step.id);
+          const status = result.success ? StepStatus.FINISHED : StepStatus.FAILED;
+          stepStates.set(step.id, { status, result });
+          
+          if (!result.success) {
+            overallTestSuccess = false;
+            executionContext.testSuccess = false;  // Update execution context for conditional logic
+          }
+        } catch (error) {
+          const errorResult: ActionResult = {
+            success: false,
+            output: {
+              error: error instanceof Error ? error.message : 'Unknown error',
+              stack: error instanceof Error ? error.stack : undefined
+            }
+          };
+          stepStates.set(step.id, { status: StepStatus.FAILED, result: errorResult });
+          stepResults.set(step.id, errorResult);
+          overallTestSuccess = false;
+          executionContext.testSuccess = false;  // Update execution context for conditional logic
+        } finally {
+          executingSteps.delete(step.id);
+        }
+      });
+
+      // Wait for at least one step to complete before checking for more ready steps
+      if (stepPromises.length > 0) {
+        await Promise.race(stepPromises);
+      } else {
+        // If no steps started, wait a bit before checking again
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    }
+
+    return overallTestSuccess;
   }
 }

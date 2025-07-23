@@ -1,0 +1,23 @@
+kind: TestCase/v0
+name: Test parallel execution with depends_on
+step:
+- name: Cleanup old test data
+  id: cleanup-old
+  kind: Echo
+  params:
+    message: "Cleaning up old data"
+
+- name: Setup test data
+  id: setup-data
+  kind: Echo
+  params:
+    message: "Setting up test data"
+
+- name: Call API
+  id: api-call
+  depends_on:
+  - setup-data
+  - cleanup-old
+  kind: Echo
+  params:
+    message: "API call after setup and cleanup"

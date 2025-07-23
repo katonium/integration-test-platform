@@ -1,0 +1,24 @@
+kind: TestCase/v0
+name: Integration Test - REST API and PostgreSQL
+step:
+- name: Cleanup old test data
+  id: cleanup-old
+  kind: Echo
+  params:
+    message: "Cleaning up old test data first"
+
+- name: Setup test data
+  id: setup-data
+  depends_on:
+  - cleanup-old
+  kind: Echo
+  params:
+    message: "Setting up test data after cleanup"
+
+- name: Call REST API to echo data
+  id: api-call
+  depends_on:
+  - invalid-step
+  kind: Echo
+  params:
+    message: "This should fail due to invalid dependency"

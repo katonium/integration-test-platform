@@ -1,0 +1,18 @@
+kind: TestCase/v0
+name: Test circular dependency detection
+step:
+- name: Step A
+  id: step-a
+  depends_on:
+  - step-b
+  kind: Echo
+  params:
+    message: "Step A depends on Step B"
+
+- name: Step B
+  id: step-b
+  depends_on:
+  - step-a
+  kind: Echo
+  params:
+    message: "Step B depends on Step A"

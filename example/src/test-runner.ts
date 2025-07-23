@@ -197,24 +197,23 @@ async function runTests() {
         // テスト開始を報告
         await reporter.reportTestStart(executionContext.testCaseId, executionContext.testCaseName);
         
-        let allPassed = true;
-        for (const step of testCase.step) {
-          try {
-            const result = await engine.executeTestStep(executionContext, step.id);
-            if (!result.success) allPassed = false;
-          } catch (error) {
-            allPassed = false;
+        // Use the new dependency-aware execution method
+        try {
+          const allPassed = await engine.executeTestCase(testCase, executionContext);
+          
+          // テスト終了を報告
+          await reporter.reportTestEnd(executionContext.testCaseId, allPassed);
+          
+          if (allPassed) {
+            console.log(`✅ ${relativePath}: PASS`);
+            totalPassed++;
+          } else {
+            console.log(`❌ ${relativePath}: FAIL`);
+            totalFailed++;
           }
-        }
-        
-        // テスト終了を報告
-        await reporter.reportTestEnd(executionContext.testCaseId, allPassed);
-        
-        if (allPassed) {
-          console.log(`✅ ${relativePath}: PASS`);
-          totalPassed++;
-        } else {
-          console.log(`❌ ${relativePath}: FAIL`);
+        } catch (error) {
+          console.log(`❌ ${relativePath}: ERROR - ${error instanceof Error ? error.message : 'Unknown error'}`);
+          await reporter.reportTestEnd(executionContext.testCaseId, false);
           totalFailed++;
         }
       }
