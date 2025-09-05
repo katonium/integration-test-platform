@@ -16,7 +16,7 @@ services:
   echo-server:
     build:
       context: ./tools/echo-server
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile-fixed
     container_name: echo-server
     ports:
       - "8080:8080"
