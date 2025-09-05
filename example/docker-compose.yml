@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   postgres:
     image: postgres:15
@@ -14,7 +16,7 @@ services:
   echo-server:
     build:
       context: ./tools/echo-server
-      dockerfile: Dockerfile-fixed
+      dockerfile: Dockerfile
     container_name: echo-server
     ports:
       - "8080:8080"
