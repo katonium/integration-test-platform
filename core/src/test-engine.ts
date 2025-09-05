@@ -1,6 +1,6 @@
-import { StepDefinition, ActionResult } from './actions/BaseAction';
-import { BaseReporter } from './reporters/BaseReporter';
-import { ActionRegistry } from './ActionRegistry';
+import { StepDefinition, ActionResult } from './actions/base-action';
+import { BaseReporter } from './reporters/base-reporter';
+import { ActionRegistry } from './action-registry';
 
 export interface TestCase {
   kind: string;
