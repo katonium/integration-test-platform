@@ -1,11 +1,10 @@
-import { BaseAction, ActionResult, StepDefinition } from './BaseAction';
+import { BaseAction, ActionResult, StepDefinition } from './base-action';
 
-export class EchoAction extends BaseAction {
+export class NopAction extends BaseAction {
   public async execute(step: StepDefinition): Promise<ActionResult> {
     return {
       success: true,
       output: {
-        echo: step.params || {},
         status: 'OK'
       }
     };

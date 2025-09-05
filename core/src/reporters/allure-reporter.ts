@@ -1,4 +1,4 @@
-import { BaseReporter } from './BaseReporter';
+import { BaseReporter } from './base-reporter';
 import { TestResult, StepResult, Status, StatusDetails } from 'allure-js-commons';
 import * as fs from 'fs';
 import * as path from 'path';

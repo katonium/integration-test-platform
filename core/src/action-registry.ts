@@ -1,4 +1,4 @@
-import { BaseAction } from './actions/BaseAction';
+import { BaseAction } from './actions/base-action';
 
 export class ActionRegistry {
   private static instance: ActionRegistry | null = null;

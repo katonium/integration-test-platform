@@ -1,5 +1,5 @@
-import { BaseAction, ActionResult, StepDefinition } from './BaseAction';
-import { Config } from '../Config';
+import { BaseAction, ActionResult, StepDefinition } from './base-action';
+import { Config } from '../config';
 const { Client } = require('pg');
 
 /**

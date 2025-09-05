@@ -1,4 +1,4 @@
-import { BaseAction, ActionResult, StepDefinition } from './BaseAction';
+import { BaseAction, ActionResult, StepDefinition } from './base-action';
 
 
 
